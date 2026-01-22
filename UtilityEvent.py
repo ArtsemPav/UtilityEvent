@@ -160,7 +160,8 @@ class LiveEventBuilderGUI(QMainWindow):
         # toolbar.addAction(add_stage_action)
         
         add_node_action = QAction(QIcon.fromTheme('list-add'), 'Add Node', self)
-        add_node_action.triggered.connect(self.add_node_dialog)
+        # Изменено: сразу добавляем ProgressNode без диалога
+        add_node_action.triggered.connect(lambda: self.add_node("ProgressNode"))
         toolbar.addAction(add_node_action)
         
         add_goal_action = QAction(QIcon.fromTheme('list-add'), 'Add Goal', self)
@@ -352,7 +353,7 @@ class LiveEventBuilderGUI(QMainWindow):
         
         self.node_id_spin = QSpinBox()
         self.node_id_spin.setRange(1, 9999)
-        self.node_id_spin.valueChanged.connect(self.update_node_data)
+        self.node_id_spin.valueChanged.connect(self.on_node_id_changed)
         layout.addRow("NodeID:", self.node_id_spin)
         
         self.next_node_id_spin = QLineEdit()
@@ -687,10 +688,63 @@ class LiveEventBuilderGUI(QMainWindow):
                         stage["StageID"] = self.stage_id_spin.value()
                         self.current_stage = stage["StageID"]
     
+    def on_node_id_changed(self, new_node_id):
+        """Обработчик изменения NodeID"""
+        # Получаем текущий текст NextNodeID
+        current_next_text = self.next_node_id_spin.text().strip()
+        
+        if current_next_text:
+            try:
+                # Проверяем, содержит ли NextNodeID только одно число
+                next_ids = []
+                for token in current_next_text.split(','):
+                    token = token.strip()
+                    if token:
+                        try:
+                            val = int(token) if token.isdigit() else float(token)
+                            if isinstance(val, float) and val.is_integer():
+                                val = int(val)
+                            next_ids.append(val)
+                        except ValueError:
+                            continue
+                
+                # Если только одно число и оно было равно старому NodeID + 1
+                if len(next_ids) == 1:
+                    old_node_id = self.current_node if self.current_node else (new_node_id - 1)
+                    if next_ids[0] == old_node_id + 1:
+                        # Автоматически обновляем на новый NodeID + 1
+                        self.next_node_id_spin.setText(str(new_node_id + 1))
+            except:
+                pass
+        else:
+            # Если поле пустое, устанавливаем NodeID + 1
+            self.next_node_id_spin.setText(str(new_node_id + 1))
+        
+        # Обновляем данные узла
+        self.update_node_data()
+    
     def update_node_data(self):
         """Обновить данные узла"""
         if self.current_event and self.current_segment and self.current_stage is not None and self.current_node is not None:
             event = self.current_event
+            
+            old_node_id = self.current_node
+            new_node_id = self.node_id_spin.value()
+            
+            # Если ID меняется
+            if new_node_id != old_node_id:
+                # 1. Проверяем уникальность
+                if self.check_node_id_exists(new_node_id, old_node_id):
+                    QMessageBox.warning(self, "Ошибка", 
+                                      f"Узел с ID {new_node_id} уже существует!")
+                    self.node_id_spin.setValue(old_node_id)
+                    return
+                
+                # 2. Обновляем ссылки в других узлах
+                self.update_node_references(old_node_id, new_node_id)
+                
+                # 3. Обновляем current_node
+                self.current_node = new_node_id
             
             if self.current_segment in event["Segments"]:
                 segment = event["Segments"][self.current_segment]
@@ -710,59 +764,30 @@ class LiveEventBuilderGUI(QMainWindow):
                                 # Обновляем данные узла
                                 node_data["NodeID"] = self.node_id_spin.value()
                                 
-                                # Парсим NextNodeID из текстового поля (всегда список)
+                                # Парсим NextNodeID из текстового поля
                                 next_node_id_text = self.next_node_id_spin.text().strip()
                                 next_node_list = []
                                 if next_node_id_text:
                                     for token in next_node_id_text.split(','):
                                         token = token.strip()
-                                        if not token:
-                                            continue
-
-                                        # Стараемся распарсить число
-                                        try:
-                                            val = float(token)
-                                        except ValueError:
-                                            continue
-
-                                        # Если это целое (например 3.0) — приводим к int
-                                        if val.is_integer():
-                                            next_node_list.append(int(val))
-                                        else:
-                                            # Оставляем float только если игра реально это поддерживает
-                                            next_node_list.append(val)
-
+                                        if token:
+                                            try:
+                                                val = int(token) if token.isdigit() else float(token)
+                                                if isinstance(val, float) and val.is_integer():
+                                                    val = int(val)
+                                                next_node_list.append(val)
+                                            except ValueError:
+                                                continue
+                                else:
+                                    # Если поле пустое, устанавливаем NodeID + 1 по умолчанию
+                                    next_node_list = [self.node_id_spin.value() + 1]
+                                
                                 node_data["NextNodeID"] = next_node_list
-                                
-                                # Парсим список игр из текстового поля
-                                games_text = self.games_edit.text().strip()
-                                if games_text:
-                                    # Разделяем по запятым, убираем пробелы и пустые строки
-                                    game_list = [game.strip() for game in games_text.split(',') if game.strip()]
-                                    node_data["GameList"] = game_list
-                                else:
-                                    node_data["GameList"] = ["AllGames"]
-                                
-                                # Обновляем MinBet
-                                if self.minbet_type_combo.currentText() == "Фиксированная":
-                                    node_data["MinBet"] = {
-                                        "FixedMinBet": {
-                                            "MinBet": self.minbet_fixed_spin.value()
-                                        }
-                                    }
-                                else:
-                                    node_data["MinBet"] = {
-                                        "MinBetVariable": {
-                                            "Variable": self.minbet_variable_spin.value(),
-                                            "Min": self.minbet_min_spin.value(),
-                                            "Max": self.minbet_max_spin.value()
-                                        }
-                                    }
                                 
                                 # Обновляем новые параметры
                                 node_data["PrizeBoxIndex"] = self.prize_box_index_spin.value()
                                 node_data["HideLoadingScreenForReward"] = self.hide_loading_screen_check.isChecked()
-                                node_data["IsChoiceEvent"] = self.is_choice_event_check.isChecked();
+                                node_data["IsChoiceEvent"] = self.is_choice_event_check.isChecked()
                                 
                                 # Обновляем остальные поля
                                 node_data["IsLastNode"] = self.is_last_node_check.isChecked()
@@ -788,9 +813,52 @@ class LiveEventBuilderGUI(QMainWindow):
                                 if "Rewards" not in node_data:
                                     node_data["Rewards"] = []
                                 
-                                self.current_node = node_data["NodeID"]
                                 self.update_event_tree()
                                 break
+    
+    def check_node_id_exists(self, node_id, exclude_id=None):
+        """Проверить, существует ли узел с указанным ID"""
+        if not self.current_event or not self.current_segment:
+            return False
+        
+        segment = self.current_event["Segments"][self.current_segment]
+        
+        for stage in segment.get("Stages", []):
+            for node_wrapper in stage.get("Nodes", []):
+                for node_type, node_data in node_wrapper.items():
+                    existing_id = node_data.get("NodeID")
+                    if existing_id == node_id and existing_id != exclude_id:
+                        return True
+        
+        return False
+    
+    def update_node_references(self, old_id, new_id):
+        """Обновить ссылки на узел в NextNodeID других узлов"""
+        if not self.current_event or not self.current_segment:
+            return
+    
+        segment = self.current_event["Segments"][self.current_segment]
+    
+        for stage in segment.get("Stages", []):
+            for node_wrapper in stage.get("Nodes", []):
+                for n_type, n_data in node_wrapper.items():
+                    # Пропускаем текущий узел
+                    if n_data.get("NodeID") == old_id:
+                        continue
+                    
+                    # Обновляем NextNodeID если там есть старый ID
+                    next_ids = n_data.get("NextNodeID", [])
+                    if not isinstance(next_ids, list):
+                        next_ids = [next_ids] if next_ids else []
+                    
+                    updated = False
+                    for i, next_id in enumerate(next_ids):
+                        if next_id == old_id:
+                            next_ids[i] = new_id
+                            updated = True
+                    
+                    if updated:
+                        n_data["NextNodeID"] = next_ids
     
     def on_node_type_changed(self, node_type):
         """Обработчик изменения типа узла"""
@@ -830,13 +898,13 @@ class LiveEventBuilderGUI(QMainWindow):
             self.contribution_combo.setEnabled(True)
             self.is_choice_event_check.setEnabled(False)
         elif node_type == "EntriesNode":        
-            self.next_node_id_spin.setEnabled(False)
+            self.next_node_id_spin.setEnabled(False)  # Для EntriesNode NextNodeID отключен
             self.minbet_type_combo.setEnabled(True)
             self.minbet_stack.setEnabled(True)
             self.games_edit.setEnabled(True)
             self.prize_box_index_spin.setEnabled(False)
             self.hide_loading_screen_check.setEnabled(False)
-            self.is_last_node_check.setEnabled(False)
+            self.is_last_node_check.setEnabled(True)
             self.resegment_flag_check.setEnabled(True)
             self.mini_game_edit.setEnabled(False)
             self.button_action_text_edit.setEnabled(True)
@@ -846,7 +914,7 @@ class LiveEventBuilderGUI(QMainWindow):
             self.possible_item_collect_edit.setEnabled(True)
             self.contribution_combo.setEnabled(True)
             self.is_choice_event_check.setEnabled(False)
-        else:        
+        else:  # EntriesProgressNode        
             self.next_node_id_spin.setEnabled(True)
             self.minbet_type_combo.setEnabled(True)
             self.minbet_stack.setEnabled(True)
@@ -1351,57 +1419,38 @@ class LiveEventBuilderGUI(QMainWindow):
         self.update_event_tree()
         self.statusBar().showMessage(f'Добавлен этап: {stage_id}')
     
-    def add_node_dialog(self):
-        """Диалог добавления нового узла"""
+    def get_next_available_node_id(self):
+        """Получить следующий доступный NodeID во всем сегменте"""
+        if not self.current_event or not self.current_segment:
+            return 1
+        
+        max_node_id = 0
+        segment = self.current_event["Segments"][self.current_segment]
+        
+        for stage in segment.get("Stages", []):
+            for node_wrapper in stage.get("Nodes", []):
+                for node_type_name, node_data in node_wrapper.items():
+                    node_id_val = node_data.get("NodeID", 0)
+                    if isinstance(node_id_val, (int, float)):
+                        max_node_id = max(max_node_id, int(node_id_val))
+        
+        return max_node_id + 1 if max_node_id > 0 else 1
+    
+    def add_node(self, node_type):
+        """Добавить узел (всегда ProgressNode)"""
         if not self.current_event or not self.current_segment or self.current_stage is None:
             QMessageBox.warning(self, "Ошибка", "Сначала выберите или создайте этап")
             return
         
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Добавить узел")
-        layout = QVBoxLayout(dialog)
+        # Получаем следующий доступный ID
+        node_id = self.get_next_available_node_id()
         
-        node_type_combo = QComboBox()
-        node_type_combo.addItems(["ProgressNode", "EntriesNode", "EntriesProgressNode", "DummyNode"])
-        layout.addWidget(QLabel("Тип узла:"))
-        layout.addWidget(node_type_combo)
-        
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.accepted.connect(dialog.accept)
-        button_box.rejected.connect(dialog.reject)
-        layout.addWidget(button_box)
-        
-        if dialog.exec_() == QDialog.Accepted:
-            node_type = node_type_combo.currentText()
-            self.add_node(node_type)
-    
-    def add_node(self, node_type):
-        """Добавить узел"""
-        if not self.current_event or not self.current_segment or self.current_stage is None:
-            return
-        
-        # Находим максимальный ID узла в текущем этапе
-        max_node_id = 0
-        segment = self.current_event["Segments"][self.current_segment]
-        for stage in segment["Stages"]:
-            if stage["StageID"] == self.current_stage:
-                for node_wrapper in stage.get("Nodes", []):
-                    for node_type_name, node_data in node_wrapper.items():
-                        if node_data.get("NodeID", 0) > max_node_id:
-                            max_node_id = node_data.get("NodeID", 0)
-                break
-        
-        # Новый узел будет иметь ID на 1 больше максимального
-        node_id = max_node_id + 1
-        if node_id < 1:
-            node_id = 1
-            
         # Обновляем спинбокс ID узла
         self.node_id_spin.setValue(node_id)
 
-        is_last = self.is_last_node_check.isChecked()
-        default_next = [] if is_last else [node_id + 1]
-        self.next_node_id_spin.setText("" if is_last else str(node_id + 1))
+        # По умолчанию NextNodeID = NodeID + 1
+        default_next = [node_id + 1]
+        self.next_node_id_spin.setText(str(node_id + 1))
         
         # Парсим список игр из текстового поля
         games_text = self.games_edit.text().strip()
@@ -1456,18 +1505,11 @@ class LiveEventBuilderGUI(QMainWindow):
             }
         
         # Добавляем в текущий этап
+        segment = self.current_event["Segments"][self.current_segment]
         for stage in segment["Stages"]:
             if stage["StageID"] == self.current_stage:
-                # Создаем узел нужного типа
-                if node_type == "ProgressNode":
-                    stage["Nodes"].append({"ProgressNode": node})
-                elif node_type == "EntriesNode":
-                    stage["Nodes"].append({"EntriesNode": node})
-                elif node_type == "EntriesProgressNode":
-                    stage["Nodes"].append({"EntriesProgressNode": node})
-                elif node_type == "DummyNode":
-                    stage["Nodes"].append({"DummyNode": node})
-                
+                # Всегда добавляем ProgressNode
+                stage["Nodes"].append({"ProgressNode": node})
                 self.current_node = node_id
                 break
         
@@ -1532,7 +1574,16 @@ class LiveEventBuilderGUI(QMainWindow):
 
                             # Сохраняем нормализованное значение обратно (важно для старых конфигов)
                             node_data["NextNodeID"] = next_node_list
-                            self.next_node_id_spin.setText(", ".join(str(x) for x in next_node_list) if next_node_list else "")
+                            
+                            # Отображаем в UI
+                            if next_node_list:
+                                # Если только один элемент и это NodeID + 1, показываем просто число
+                                if len(next_node_list) == 1 and next_node_list[0] == item_id + 1:
+                                    self.next_node_id_spin.setText(str(next_node_list[0]))
+                                else:
+                                    self.next_node_id_spin.setText(", ".join(str(x) for x in next_node_list))
+                            else:
+                                self.next_node_id_spin.setText("")
 
                             # GameList
                             game_list = node_data.get("GameList", [])
