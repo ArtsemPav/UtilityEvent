@@ -390,9 +390,10 @@ def display_event_structure(event):
                             var_data = min_bet['MinBetVariable']
                             st.write(f"💰 **Variable MinBet:** Var={var_data['Variable']}, Min={var_data['Min']}, Max={var_data['Max']}")
                     
-                    # Показываем CustomTexts если есть
                     if 'CustomTexts' in node_info and node_info['CustomTexts']:
-                        st.write(f"📝 **Custom Texts:** {', '.join(node_info['CustomTexts'])}")
+                        st.write(f"📝 **Custom Texts:**")
+                        for i, text in enumerate(node_info['CustomTexts']):
+                            st.write(f"   {i+1}. {text}")
 
 
 def make_minbet_block(prefix="", default_type="Fixed"):
@@ -826,6 +827,18 @@ def get_default_goal():
 def get_default_reward():
     """Возвращает награду по умолчанию (Chips)"""
     return make_reward("Chips", {"amount": 2500000})
+
+def process_multiline_custom_texts(text: str) -> list[str]:
+    """
+    Преобразует многострочный текст в список строк
+    Пустые строки игнорируются
+    """
+    if not text:  # Если текст пустой, возвращаем пустой список
+        return []
+    
+    # Разделяем по строкам, удаляем пустые и обрезаем пробелы
+    lines = [line.strip() for line in text.split('\n') if line.strip()]
+    return lines
 
 st.set_page_config(page_title="LiveEvent JSON Builder", layout="wide")
 st.title("🎮 LiveEvent JSON Builder (Multi-Segment Support with PossibleSegmentInfo)")
@@ -1280,7 +1293,14 @@ with tab2:
                             st.session_state.progress_rewards.append(new_reward)
                             st.rerun()
             
-            custom_texts = st.text_input("CustomTexts (через |)", value="15", key="p_ct")
+            custom_texts = st.text_area(
+                "CustomTexts (каждая строка - отдельный текст)", 
+                value="SPIN\n##\nTIMES", 
+                height=None,
+                key="p_ct",
+                help="Вводите каждый текст с новой строки",
+                kwargs={"autosize": True}
+            )
             item_collect = st.text_input("PossibleItemCollect (optional)", value="", key="p_ic")
             
             # Кнопка добавления ноды
@@ -1307,7 +1327,7 @@ with tab2:
                     button_action_type=button_type,
                     button_action_data=button_data,
                     button_action_text=button_text,
-                    custom_texts=[x.strip() for x in custom_texts.split("|") if x.strip()],
+                    custom_texts=process_multiline_custom_texts(custom_texts),
                     possible_item_collect=item_collect.strip(),
                 )
                 nodes.append(node)
@@ -1327,7 +1347,7 @@ with tab2:
             # Автоматические значения по умолчанию
             default_entry_types = "MyEvent"
             default_goal_type = "Spins"
-            default_game = "SomeGame"
+            default_game = "AllGames"
             
             col1, col2 = st.columns(2)
             with col1:
@@ -1336,15 +1356,23 @@ with tab2:
             
             with col2:
                 goal_type = st.text_input("GoalType", value=default_goal_type, key="e_goal")
-                button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="e_btn")
+                button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_11")
+                button_type = st.text_input("ButtonActionType", value="", key="btn_12")
+                button_data = st.text_input("ButtonActionData", value="", key="btn_13")
             
             entry_types_raw = st.text_input("EntryTypes (через запятую)", value=default_entry_types, key="e_entry_types")
             
             # MinBet выбор
             min_bet = make_minbet_block("E", default_type="Fixed")
             
-            custom_texts = st.text_input("CustomTexts (через |)", 
-                value="SPIN|$1000|No Purchase Required To Enter", key="e_ct")
+            custom_texts = st.text_area(
+                "CustomTexts (каждая строка - отдельный текст)", 
+                value="", 
+                height=None,
+                key="e_ct",
+                help="Вводите каждый текст с новой строки",
+                kwargs={"autosize": True}
+            )
             item_collect = st.text_input("PossibleItemCollect", value="Default", key="e_ic")
             
             if st.button("➕ Добавить Entries Node в сегмент", key="add_entries", use_container_width=True):
@@ -1354,10 +1382,10 @@ with tab2:
                     min_bet=min_bet,
                     goal_types=[goal_type],
                     resegment=False,
-                    button_action_type="Game",
-                    button_action_data=game_name,
+                    button_action_type=button_type,
+                    button_action_data=button_data,
                     button_action_text=button_text,
-                    custom_texts=[x.strip() for x in custom_texts.split("|") if x.strip()],
+                    custom_texts=process_multiline_custom_texts(custom_texts),
                     entry_types=[x.strip() for x in entry_types_raw.split(",") if x.strip()],
                     possible_item_collect=item_collect.strip() or "Default",
                 )
@@ -1420,7 +1448,14 @@ with tab2:
                         st.session_state.temp_rewards.append(fixed_reward)
                         st.rerun()
             
-            custom_texts = st.text_input("CustomTexts (через |)", value="OPTION A|OPTION B|OPTION C", key="d_ct")
+            custom_texts = st.text_area(
+                "CustomTexts (каждая строка - отдельный текст)", 
+                value="", 
+                height=None,
+                key="d_ct",
+                help="Вводите каждый текст с новой строки",
+                kwargs={"autosize": True}
+            )
             
             if st.button("➕ Добавить Dummy Choice Node в сегмент", key="add_dummy", use_container_width=True):
                 if not st.session_state.temp_rewards:
@@ -1446,7 +1481,7 @@ with tab2:
                         button_action_type="",
                         button_action_data="",
                         button_action_text=button_text,
-                        custom_texts=[x.strip() for x in custom_texts.split("|") if x.strip()],
+                        custom_texts=process_multiline_custom_texts(custom_texts),
                         is_choice_event=bool(is_choice),
                     )
                     nodes.append(node)
