@@ -819,6 +819,13 @@ def reward_creator_block(prefix="", reward_index=0):
     
     return make_reward(reward_type, params)
 
+def get_default_goal():
+    """Возвращает цель по умолчанию (FixedGoal)"""
+    return make_goal("Spins", make_fixed_goal(20))
+    
+def get_default_reward():
+    """Возвращает награду по умолчанию (Chips)"""
+    return make_reward("Chips", {"amount": 2500000})
 
 st.set_page_config(page_title="LiveEvent JSON Builder", layout="wide")
 st.title("🎮 LiveEvent JSON Builder (Multi-Segment Support with PossibleSegmentInfo)")
@@ -829,23 +836,23 @@ if "cfg" not in st.session_state:
 if "schema" not in st.session_state:
     st.session_state.schema = None
 if "current_event_segments" not in st.session_state:
-    st.session_state.current_event_segments = {}  # Dict: segment_name -> dict with Stages and PossibleSegmentInfo
+    st.session_state.current_event_segments = {}
 if "current_editing_segment" not in st.session_state:
-    st.session_state.current_editing_segment = None  # Имя текущего редактируемого сегмента
+    st.session_state.current_editing_segment = None
 if "current_editing_nodes" not in st.session_state:
-    st.session_state.current_editing_nodes = []  # Ноды текущей стадии (всегда Stage 1)
+    st.session_state.current_editing_nodes = []
 if "editing_event_idx" not in st.session_state:
     st.session_state.editing_event_idx = -1
 if "temp_rewards" not in st.session_state:
-    st.session_state.temp_rewards = []  # Временный список наград для текущей ноды
+    st.session_state.temp_rewards = [get_default_reward()]  # Изменено
 if "temp_goal" not in st.session_state:
-    st.session_state.temp_goal = None  # Временная цель для текущей ноды
+    st.session_state.temp_goal = get_default_goal()  # Изменено
 if "last_node_tab" not in st.session_state:
     st.session_state.last_node_tab = None
 if 'progress_rewards' not in st.session_state:
-    st.session_state.progress_rewards = []
+    st.session_state.progress_rewards = [get_default_reward()]  # Изменено
 if 'progress_goal' not in st.session_state:
-    st.session_state.progress_goal = None
+    st.session_state.progress_goal = get_default_goal()  # Изменено
 if 'last_progress_reward_count' not in st.session_state:
     st.session_state.last_progress_reward_count = 0
 
@@ -1184,7 +1191,9 @@ with tab2:
             
             # Сброс при переключении на вкладку
             if st.session_state.last_node_tab != "progress":
-                st.session_state.progress_goal = None
+                # Автоматически устанавливаем default цель и награду
+                st.session_state.progress_goal = get_default_goal()
+                st.session_state.progress_rewards = [get_default_reward()]
                 st.session_state.last_node_tab = "progress"
             
             col1, col2 = st.columns(2)
@@ -1201,47 +1210,37 @@ with tab2:
                 is_last_node = st.checkbox("IsLastNode", value=False, key="is_last")
             
             # MinBet выбор
-            min_bet = make_minbet_block("P", default_type="Variable")
+            min_bet = make_minbet_block("P", default_type="Fixed")
             
             st.write("---")
             st.write("**Цель:**")
             
-            # Создание цели с кнопкой применения
-            current_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress_{len(nodes)}")
-            if current_goal is not None:
-                st.session_state.progress_goal = current_goal
-            
-            # Отображение текущей цели, если она есть
+            # Отображение текущей цели (автоматически заполнена)
             if st.session_state.progress_goal is not None:
                 goal = st.session_state.progress_goal
                 goal_types = goal.get('Type', [])
                 goal_type_str = ', '.join(goal_types) if goal_types else "No Type"
                 
                 # Определяем тип параметров
-                params_type = "Unknown"
-                if 'SpinpadGoal' in goal:
-                    params_type = "SpinpadGoal"
-                elif 'FixedGoal' in goal:
-                    params_type = "FixedGoal"
-                elif 'ConsecutiveWinsGoal' in goal:
-                    params_type = "ConsecutiveWinsGoal"
-                elif 'TotalCoinsPerDay' in goal:
-                    params_type = "TotalCoinsPerDay"
-                elif 'TotalCoinsPerDayWithSpinLimiter' in goal:
-                    params_type = "TotalCoinsPerDayWithSpinLimiter"
-                elif 'FixedGoalWithSpinLimiter' in goal:
-                    params_type = "FixedGoalWithSpinLimiter"
+                params_type = "FixedGoal"  # По умолчанию
                 
-                st.success(f"✅ Текущая цель: {goal_type_str} с параметрами {params_type}")
+                st.success(f"✅ Текущая цель (по умолчанию): {goal_type_str} с параметрами {params_type}")
+                
+                # Добавляем возможность изменить цель через goal_creator_block
+                st.write("**Изменить цель (если нужно):**")
+                new_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress_{len(nodes)}")
+                if new_goal is not None:
+                    st.session_state.progress_goal = new_goal
+                    st.rerun()
             
             st.write("---")
             st.write("**Награды:**")
             
-            # Отображение текущих наград
+            # Отображение текущих наград (автоматически заполнены)
             if st.session_state.progress_rewards:
                 st.write(f"Добавлено наград: {len(st.session_state.progress_rewards)}")
                 for j, reward in enumerate(st.session_state.progress_rewards):
-                    colr1, colr2 = st.columns([5, 1])
+                    colr1, colr2, colr3 = st.columns([4, 1, 1])
                     with colr1:
                         # Краткое описание награды
                         if 'FixedReward' in reward:
@@ -1259,20 +1258,27 @@ with tab2:
                             desc = str(reward)[:50]
                         st.write(f"  {j+1}. {desc}")
                     with colr2:
+                        if st.button("✏️", key=f"edit_reward_progress_{j}"):
+                            st.info("Редактирование будет доступно позже")
+                    with colr3:
                         if st.button("❌", key=f"remove_reward_progress_{j}"):
                             st.session_state.progress_rewards.pop(j)
                             st.rerun()
             else:
                 st.info("📭 Награды не добавлены")
+                # Если наград нет, добавляем default
+                st.session_state.progress_rewards = [get_default_reward()]
+                st.rerun()
             
-            # Добавление новой награды
-            new_reward = reward_creator_block("P", reward_index=f"progress_{len(st.session_state.progress_rewards)}")
-            col_button, _ = st.columns([1, 3])
-            with col_button:
-                if st.button("➕ Добавить эту награду в список", key="add_reward_progress"):
-                    if new_reward:
-                        st.session_state.progress_rewards.append(new_reward)
-                        st.rerun()
+            # Добавление новой награды (опционально)
+            with st.expander("➕ Добавить дополнительную награду"):
+                new_reward = reward_creator_block("P", reward_index=f"progress_extra_{len(st.session_state.progress_rewards)}")
+                col_button, _ = st.columns([1, 3])
+                with col_button:
+                    if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra"):
+                        if new_reward:
+                            st.session_state.progress_rewards.append(new_reward)
+                            st.rerun()
             
             custom_texts = st.text_input("CustomTexts (через |)", value="15", key="p_ct")
             item_collect = st.text_input("PossibleItemCollect (optional)", value="", key="p_ic")
@@ -1280,60 +1286,62 @@ with tab2:
             # Кнопка добавления ноды
             if st.button("➕ Добавить Progress Node в сегмент", key="add_progress", use_container_width=True):
                 if st.session_state.progress_goal is None:
-                    st.warning("⚠️ Примените цель (нажмите кнопку 'Применить цель')")
-                elif not st.session_state.progress_rewards:
-                    st.warning("⚠️ Добавьте хотя бы одну награду")
-                else:
-                    node = make_progress_node(
-                        node_id=int(node_id),
-                        next_ids=[int(next_id)],
-                        game_list=[x.strip() for x in games.split(",") if x.strip()],
-                        min_bet=min_bet,
-                        goal=st.session_state.progress_goal,
-                        rewards=st.session_state.progress_rewards,
-                        is_last=is_last_node,
-                        resegment=False,
-                        mini_game=minigame,
-                        contribution_level="Node",
-                        button_action_type=button_type,
-                        button_action_data=button_data,
-                        button_action_text=button_text,
-                        custom_texts=[x.strip() for x in custom_texts.split("|") if x.strip()],
-                        possible_item_collect=item_collect.strip(),
-                    )
-                    nodes.append(node)
-                    st.session_state.current_editing_nodes = nodes
-                    st.session_state.progress_rewards = []
-                    st.session_state.progress_goal = None
-                    # Очищаем примененную цель из session state
-                    for key in list(st.session_state.keys()):
-                        if key.startswith("applied_goal_P_goal_0_progress"):
-                            del st.session_state[key]
-                    st.success(f"✅ Progress Node (ID: {node_id}) добавлена в сегмент")
-                    st.rerun()
+                    st.warning("⚠️ Цель не установлена, используется по умолчанию")
+                    st.session_state.progress_goal = get_default_goal()
+                
+                if not st.session_state.progress_rewards:
+                    st.warning("⚠️ Награды не добавлены, используется по умолчанию")
+                    st.session_state.progress_rewards = [get_default_reward()]
+                
+                node = make_progress_node(
+                    node_id=int(node_id),
+                    next_ids=[int(next_id)],
+                    game_list=[x.strip() for x in games.split(",") if x.strip()],
+                    min_bet=min_bet,
+                    goal=st.session_state.progress_goal,
+                    rewards=st.session_state.progress_rewards,
+                    is_last=is_last_node,
+                    resegment=False,
+                    mini_game=minigame,
+                    contribution_level="Node",
+                    button_action_type=button_type,
+                    button_action_data=button_data,
+                    button_action_text=button_text,
+                    custom_texts=[x.strip() for x in custom_texts.split("|") if x.strip()],
+                    possible_item_collect=item_collect.strip(),
+                )
+                nodes.append(node)
+                st.session_state.current_editing_nodes = nodes
+                
+                # Сбрасываем для следующей ноды, но оставляем default значения
+                st.session_state.progress_rewards = [get_default_reward()]
+                st.session_state.progress_goal = get_default_goal()
+                
+                st.success(f"✅ Progress Node (ID: {node_id}) добавлена в сегмент")
+                st.rerun()
         
         # Entries Node Tab
         with node_tabs[1]:
             st.subheader("➕ Добавить Entries Node")
             
-            # Сброс временных наград при переключении на вкладку
-            if st.session_state.last_node_tab != "entries":
-                st.session_state.temp_goal = None
-                st.session_state.last_node_tab = "entries"
+            # Автоматические значения по умолчанию
+            default_entry_types = "MyEvent"
+            default_goal_type = "Spins"
+            default_game = "SomeGame"
             
             col1, col2 = st.columns(2)
             with col1:
                 node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="e_node_id")
-                game_name = st.text_input("GameName", value="SomeGame", key="e_game")
+                game_name = st.text_input("GameName", value=default_game, key="e_game")
             
             with col2:
-                goal_type = st.text_input("GoalType", value="Spins", key="e_goal")
+                goal_type = st.text_input("GoalType", value=default_goal_type, key="e_goal")
                 button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="e_btn")
             
-            entry_types_raw = st.text_input("EntryTypes (через запятую)", value="MyEvent", key="e_entry_types")
+            entry_types_raw = st.text_input("EntryTypes (через запятую)", value=default_entry_types, key="e_entry_types")
             
             # MinBet выбор
-            min_bet = make_minbet_block("E", default_type="Variable")
+            min_bet = make_minbet_block("E", default_type="Fixed")
             
             custom_texts = st.text_input("CustomTexts (через |)", 
                 value="SPIN|$1000|No Purchase Required To Enter", key="e_ct")
