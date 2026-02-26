@@ -395,7 +395,7 @@ def display_event_structure(event):
                         st.write(f"📝 **Custom Texts:** {', '.join(node_info['CustomTexts'])}")
 
 
-def make_minbet_block(prefix="", default_type="Variable"):
+def make_minbet_block(prefix="", default_type="Fixed"):
     """
     Создает блок выбора типа MinBet (Fixed или Variable)
     Возвращает словарь с конфигурацией MinBet
@@ -404,8 +404,8 @@ def make_minbet_block(prefix="", default_type="Variable"):
     
     minbet_type = st.radio(
         "Выберите тип",
-        options=["Variable", "Fixed"],
-        index=0 if default_type == "Variable" else 1,
+        options=["Fixed", "Variable"],
+        index=0,
         key=f"{prefix}_minbet_type",
         horizontal=True,
         label_visibility="collapsed"
@@ -467,9 +467,9 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
     
     # Используем session state для хранения временных значений цели
     if f"temp_goal_type_{unique_key}" not in st.session_state:
-        st.session_state[f"temp_goal_type_{unique_key}"] = "Item_BISON"
+        st.session_state[f"temp_goal_type_{unique_key}"] = "Spins"
     if f"temp_goal_params_{unique_key}" not in st.session_state:
-        st.session_state[f"temp_goal_params_{unique_key}"] = "SpinpadGoal"
+        st.session_state[f"temp_goal_params_{unique_key}"] = "FixedGoal"
     
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -493,9 +493,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
                 "TotalCoinsPerDayWithSpinLimiter",
                 "FixedGoalWithSpinLimiter"
             ],
-            index=["SpinpadGoal", "FixedGoal", "ConsecutiveWinsGoal", 
-                   "TotalCoinsPerDay", "TotalCoinsPerDayWithSpinLimiter", 
-                   "FixedGoalWithSpinLimiter"].index(st.session_state[f"temp_goal_params_{unique_key}"]),
+            index=1,
             key=f"{unique_key}_params_type"
         )
         # Сохраняем в session state
@@ -969,7 +967,7 @@ with tab2:
                 value=default_event.get('NumberOfRepeats', -1), step=1, 
                 key="repeats")
             content_key = st.text_input("ContentKey", 
-                value=default_event.get('ContentKey', ''), 
+                value=default_event.get('ContentKey', 'MyEvent'), 
                 key="content_key")
         with c3:
             start_currency = st.number_input("StartingEventCurrency", 
