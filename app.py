@@ -640,7 +640,6 @@ def make_minbet_block(prefix="", default_type="Fixed"):
             )
         return make_fixed_minbet(float(fixed_value))
 
-
 def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
     """
     Создает интерфейс для создания цели
@@ -664,35 +663,38 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
             key=f"{unique_key}_type_str",
             help="Строка, которая будет в массиве Type, например: Item_BISON, Spins, и т.д."
         )
-        # Сохраняем в session state
-        st.session_state[f"temp_goal_type_{unique_key}"] = goal_type
     
     with col2:
+        # Определяем индекс для selectbox
+        params_options = [
+            "SpinpadGoal",
+            "FixedGoal",
+            "ConsecutiveWinsGoal",
+            "TotalCoinsPerDay",
+            "TotalCoinsPerDayWithSpinLimiter",
+            "FixedGoalWithSpinLimiter"
+        ]
+        current_params = st.session_state[f"temp_goal_params_{unique_key}"]
+        params_index = params_options.index(current_params) if current_params in params_options else 1
+        
         goal_params_type = st.selectbox(
             "Параметры цели",
-            options=[
-                "SpinpadGoal",
-                "FixedGoal",
-                "ConsecutiveWinsGoal",
-                "TotalCoinsPerDay",
-                "TotalCoinsPerDayWithSpinLimiter",
-                "FixedGoalWithSpinLimiter"
-            ],
-            index=1,
+            options=params_options,
+            index=params_index,
             key=f"{unique_key}_params_type"
         )
-        # Сохраняем в session state
-        st.session_state[f"temp_goal_params_{unique_key}"] = goal_params_type
     
     st.write("**Параметры:**")
     
-    # Используем unique ключи для всех элементов ввода
+    # ИНИЦИАЛИЗИРУЕМ goal_params ЗНАЧЕНИЕМ ПО УМОЛЧАНИЮ
+    goal_params = make_fixed_goal(20)  # Значение по умолчанию
+    
     if goal_params_type == "SpinpadGoal":
         c1, c2, c3 = st.columns(3)
         with c1:
             multiplier = st.number_input(
                 "Multiplier",
-                value=0.5,
+                value=st.session_state.get(f"{unique_key}_multiplier", 0.5),
                 min_value=0.0,
                 max_value=10.0,
                 step=0.1,
@@ -702,7 +704,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c2:
             min_val = st.number_input(
                 "Min",
-                value=10,
+                value=st.session_state.get(f"{unique_key}_min", 10),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_min"
@@ -710,7 +712,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c3:
             max_val = st.number_input(
                 "Max",
-                value=150,
+                value=st.session_state.get(f"{unique_key}_max", 150),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_max"
@@ -720,7 +722,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
     elif goal_params_type == "FixedGoal":
         target = st.number_input(
             "Target",
-            value=20,
+            value=st.session_state.get(f"{unique_key}_target", 20),
             min_value=1,
             step=1,
             key=f"{unique_key}_target"
@@ -732,7 +734,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c1:
             streaks = st.number_input(
                 "Number of Streaks",
-                value=3,
+                value=st.session_state.get(f"{unique_key}_streaks", 3),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_streaks"
@@ -740,7 +742,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c2:
             multiplier = st.number_input(
                 "Multiplier",
-                value=0.01,
+                value=st.session_state.get(f"{unique_key}_wins_multiplier", 0.01),
                 min_value=0.0,
                 max_value=1.0,
                 step=0.01,
@@ -752,7 +754,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c3:
             min_val = st.number_input(
                 "Min",
-                value=2,
+                value=st.session_state.get(f"{unique_key}_wins_min", 2),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_wins_min"
@@ -760,7 +762,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c4:
             max_val = st.number_input(
                 "Max",
-                value=5,
+                value=st.session_state.get(f"{unique_key}_wins_max", 5),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_wins_max"
@@ -772,7 +774,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c1:
             multiplier = st.number_input(
                 "Multiplier",
-                value=0.5,
+                value=st.session_state.get(f"{unique_key}_tcpd_multiplier", 0.5),
                 min_value=0.0,
                 max_value=10.0,
                 step=0.1,
@@ -782,7 +784,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c2:
             min_val = st.number_input(
                 "Min",
-                value=10,
+                value=st.session_state.get(f"{unique_key}_tcpd_min", 10),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_tcpd_min"
@@ -790,7 +792,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c3:
             max_val = st.number_input(
                 "Max",
-                value=150,
+                value=st.session_state.get(f"{unique_key}_tcpd_max", 150),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_tcpd_max"
@@ -802,14 +804,14 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c1:
             spin_limiter = st.number_input(
                 "Spin Limiter",
-                value=3,
+                value=st.session_state.get(f"{unique_key}_spin_limiter", 3),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_spin_limiter"
             )
             multiplier = st.number_input(
                 "Multiplier",
-                value=0.097,
+                value=st.session_state.get(f"{unique_key}_tcpdwl_multiplier", 0.097),
                 min_value=0.0,
                 max_value=1.0,
                 step=0.001,
@@ -819,14 +821,14 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c2:
             min_val = st.number_input(
                 "Min",
-                value=3500000,
+                value=st.session_state.get(f"{unique_key}_tcpdwl_min", 3500000),
                 min_value=1,
                 step=1000,
                 key=f"{unique_key}_tcpdwl_min"
             )
             max_val = st.number_input(
                 "Max",
-                value=50000000,
+                value=st.session_state.get(f"{unique_key}_tcpdwl_max", 50000000),
                 min_value=1,
                 step=1000,
                 key=f"{unique_key}_tcpdwl_max"
@@ -838,7 +840,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c1:
             target = st.number_input(
                 "Target",
-                value=10,
+                value=st.session_state.get(f"{unique_key}_fgwl_target", 10),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_fgwl_target"
@@ -846,7 +848,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
         with c2:
             spin_limiter = st.number_input(
                 "Spin Limiter",
-                value=3,
+                value=st.session_state.get(f"{unique_key}_fgwl_spin_limiter", 3),
                 min_value=1,
                 step=1,
                 key=f"{unique_key}_fgwl_spin_limiter"
@@ -855,31 +857,36 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
     
     st.write("---")
     
-    # Кнопка применения цели
-    col_button1, col_button2 = st.columns(2)
-    with col_button1:
-        apply_button = st.button("✅ Применить цель", key=f"{unique_key}_apply", use_container_width=True)
-    with col_button2:
-        clear_button = st.button("🔄 Очистить", key=f"{unique_key}_clear", use_container_width=True)
+    # Кнопка применения цели (только одна)
+    apply_button = st.button("✅ Применить цель", key=f"{unique_key}_apply", use_container_width=True)
+    
+    # Всегда создаем текущую цель
+    current_goal = make_goal(goal_type, goal_params)
     
     if apply_button:
-        # Создаем полную цель с Type и параметрами
-        goal = make_goal(goal_type, goal_params)
-        st.session_state[f"applied_goal_{unique_key}"] = goal
-        st.success(f"✅ Цель применена: {goal_type} с параметрами {goal_params_type}")
-        return goal
-    elif clear_button:
-        if f"applied_goal_{unique_key}" in st.session_state:
-            del st.session_state[f"applied_goal_{unique_key}"]
-        st.info("🔄 Цель очищена")
-        return None
+        # Сохраняем текущие значения в session_state для последующего использования
+        st.session_state[f"temp_goal_type_{unique_key}"] = goal_type
+        st.session_state[f"temp_goal_params_{unique_key}"] = goal_params_type
+        
+        # Обновляем прогресс цель в session_state
+        if prefix == "P":
+            st.session_state.progress_goal = current_goal
+            # Сохраняем текущие значения для отображения
+            st.session_state.last_goal_type = goal_type
+            st.session_state.last_goal_params = goal_params_type
+        else:
+            st.session_state[f"applied_goal_{unique_key}"] = current_goal
+        
+        # Принудительно обновляем интерфейс
+        st.rerun()
     
-    # Возвращаем примененную цель, если она есть
-    if f"applied_goal_{unique_key}" in st.session_state:
+    # Возвращаем примененную цель
+    if prefix == "P":
+        return st.session_state.progress_goal
+    elif f"applied_goal_{unique_key}" in st.session_state:
         return st.session_state[f"applied_goal_{unique_key}"]
     
-    return None
-
+    return current_goal
 
 def reward_creator_block(prefix="", reward_index=0):
     """
@@ -1639,23 +1646,35 @@ with tab2:
                         
                         st.write("---")
                         st.write("**Цель:**")
-                        
+
                         # Отображение текущей цели
                         if st.session_state.progress_goal is not None:
                             goal = st.session_state.progress_goal
                             goal_types = goal.get('Type', [])
                             goal_type_str = ', '.join(goal_types) if goal_types else "No Type"
                             
-                            if st.session_state.is_editing_node:
-                                st.success(f"✅ Текущая цель (загружена из редактируемой ноды): {goal_type_str}")
-                            else:
-                                st.success(f"✅ Текущая цель (по умолчанию): {goal_type_str}")
+                            # Определяем тип параметров цели из структуры goal
+                            goal_params_type = "Unknown"
+                            if goal:
+                                # Ищем ключ, который не равен "Type"
+                                for key in goal.keys():
+                                    if key != "Type":
+                                        goal_params_type = key
+                                        break
                             
-                            st.write("**Изменить цель (если нужно):**")
+                            # Используем сохраненные значения из session_state если они есть
+                            display_goal_type = st.session_state.get('last_goal_type', goal_type_str)
+                            display_goal_params = st.session_state.get('last_goal_params', goal_params_type)
+                            
+                            if st.session_state.is_editing_node:
+                                st.success(f"✅ Текущая цель: {display_goal_type} с параметрами {display_goal_params}")
+                            else:
+                                st.success(f"✅ Текущая цель: {display_goal_type} с параметрами {display_goal_params}")
+                            
                             new_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress_edit" if st.session_state.is_editing_node else "progress")
+                            # Всегда обновляем цель, даже если она не None
                             if new_goal is not None:
                                 st.session_state.progress_goal = new_goal
-                                st.rerun()
                         
                         st.write("---")
                         st.write("**Награды:**")
