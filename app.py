@@ -274,8 +274,6 @@ def display_event_structure(event):
     """Показывает древовидную структуру события"""
     event_data = event['PossibleNodeEventData']
     st.write(f"📦 **Событие:** {event_data['EventID']}")
-    st.write(f"   📊 Уровень: {event_data['MinLevel']}")
-    st.write(f"   🔄 Повторов: {event_data['NumberOfRepeats']}")
     
     # Отображаем все сегменты
     for segment_name, segment_data in event_data['Segments'].items():
@@ -307,7 +305,7 @@ def display_event_structure(event):
                 st.warning(f"      ⚠️ Неизвестный формат стадии")
                 continue
                 
-            st.write(f"      📍 **Stage {stage_id}**")
+            ##st.write(f"      📍 **Stage {stage_id}**")
             
             for i, node_data in enumerate(nodes):
                 if not isinstance(node_data, dict):
@@ -316,83 +314,8 @@ def display_event_structure(event):
                 node_type = list(node_data.keys())[0] if node_data else "Unknown"
                 node_info = node_data.get(node_type, {})
                 
-                # Создаем древовидный вывод с отступами
-                with st.expander(f"      🔹 {node_type} (ID: {node_info.get('NodeID', 'N/A')})"):
-                    # Основные параметры ноды
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if 'NextNodeID' in node_info:
-                            st.write(f"➡️ **Next:** {node_info['NextNodeID']}")
-                        if 'GameList' in node_info:
-                            st.write(f"🎮 **Games:** {', '.join(node_info['GameList'])}")
-                        if 'IsLastNode' in node_info:
-                            st.write(f"🏁 **Is Last:** {node_info['IsLastNode']}")
-                    
-                    with col2:
-                        if 'Rewards' in node_info and node_info['Rewards']:
-                            rewards_text = []
-                            for reward in node_info['Rewards']:
-                                if isinstance(reward, dict):
-                                    if 'FixedReward' in reward:
-                                        rewards_text.append(f"{reward['FixedReward'].get('Amount', 'N/A')} {reward['FixedReward'].get('Currency', '')}")
-                                    elif 'RtpReward' in reward:
-                                        rtp = reward['RtpReward']
-                                        rewards_text.append(f"RTP {rtp.get('Percentage', 0)*100}% {rtp.get('Currency', '')} (Min:{rtp.get('Min',0)} Max:{rtp.get('Max',0)})")
-                                    elif 'FreeplayUnlockReward' in reward:
-                                        fp = reward['FreeplayUnlockReward']
-                                        rewards_text.append(f"FreePlay {fp.get('Spins',0)} on {fp.get('GameName','')}")
-                                    elif 'CollectableSellPacksReward' in reward:
-                                        pack = reward['CollectableSellPacksReward']
-                                        rewards_text.append(f"Pack {pack.get('NumPacks',0)}x {pack.get('PackId','')}")
-                            if rewards_text:
-                                st.write(f"💰 **Rewards:**")
-                                for r in rewards_text:
-                                    st.write(f"   • {r}")
-                        if 'ButtonActionText' in node_info:
-                            st.write(f"🔘 **Button:** {node_info['ButtonActionText']}")
-                    
-                    # Показываем Goal
-                    if 'Goal' in node_info:
-                        goal = node_info['Goal']
-                        goal_types = goal.get('Type', [])
-                        goal_type_str = ', '.join(goal_types) if goal_types else "No Type"
-                        st.write(f"🎯 **Goal Type:** {goal_type_str}")
-                        
-                        # Показываем параметры цели
-                        if 'SpinpadGoal' in goal:
-                            data = goal['SpinpadGoal']
-                            st.write(f"   **SpinpadGoal:** Mult: {data.get('Multiplier')}, Min: {data.get('Min')}, Max: {data.get('Max')}")
-                        elif 'FixedGoal' in goal:
-                            data = goal['FixedGoal']
-                            st.write(f"   **FixedGoal:** Target: {data.get('Target')}")
-                        elif 'ConsecutiveWinsGoal' in goal:
-                            data = goal['ConsecutiveWinsGoal']
-                            st.write(f"   **ConsecutiveWinsGoal:** Streaks: {data.get('NumberOfStreaksTarget')}")
-                            wins_data = data.get('WinsInStreakSpinPadGoal', {})
-                            st.write(f"      Wins in streak - Mult: {wins_data.get('Multiplier')}, Min: {wins_data.get('Min')}, Max: {wins_data.get('Max')}")
-                        elif 'TotalCoinsPerDay' in goal:
-                            data = goal['TotalCoinsPerDay']
-                            st.write(f"   **TotalCoinsPerDay:** Mult: {data.get('Multiplier')}, Min: {data.get('Min')}, Max: {data.get('Max')}")
-                        elif 'TotalCoinsPerDayWithSpinLimiter' in goal:
-                            data = goal['TotalCoinsPerDayWithSpinLimiter']
-                            st.write(f"   **TotalCoinsPerDayWithSpinLimiter:** Mult: {data.get('Multiplier')}, Min: {data.get('Min')}, Max: {data.get('Max')}, SpinLimiter: {data.get('SpinLimiter')}")
-                        elif 'FixedGoalWithSpinLimiter' in goal:
-                            data = goal['FixedGoalWithSpinLimiter']
-                            st.write(f"   **FixedGoalWithSpinLimiter:** Target: {data.get('Target')}, SpinLimiter: {data.get('SpinLimiter')}")
-                    
-                    # Показываем MinBet
-                    if 'MinBet' in node_info:
-                        min_bet = node_info['MinBet']
-                        if 'FixedMinBet' in min_bet:
-                            st.write(f"💰 **Fixed MinBet:** {min_bet['FixedMinBet']['MinBet']}")
-                        elif 'MinBetVariable' in min_bet:
-                            var_data = min_bet['MinBetVariable']
-                            st.write(f"💰 **Variable MinBet:** Var={var_data['Variable']}, Min={var_data['Min']}, Max={var_data['Max']}")
-                    
-                    if 'CustomTexts' in node_info and node_info['CustomTexts']:
-                        st.write(f"📝 **Custom Texts:**")
-                        for i, text in enumerate(node_info['CustomTexts']):
-                            st.write(f"   {i+1}. {text}")
+                st.write(f"      🔹 {node_type} (NodeID: {node_info.get('NodeID', 'N/A')}, NextNodeID: {node_info.get('NextNodeID', 'N/A')})")
+
 
 
 def make_minbet_block(prefix="", default_type="Fixed"):
@@ -991,6 +914,80 @@ with tab2:
                 value=default_event.get('StartingEventCurrency', 0.0), key="start_currency")
             is_currency_event = st.checkbox("IsCurrencyEvent", 
                 value=default_event.get('IsCurrencyEvent', False), key="is_currency")
+            
+            # ========== НОВАЯ КНОПКА СОЗДАНИЯ СОБЫТИЯ ==========
+            st.divider()
+            col_create_btn1, col_create_btn2 = st.columns(2)
+            with col_create_btn1:
+                if st.button("✨ БЫСТРОЕ СОЗДАНИЕ СОБЫТИЯ", use_container_width=True, type="primary"):
+                    # Создаем базовое событие с Default сегментом
+                    if not st.session_state.current_event_segments:
+                        # Создаем Default сегмент если его нет
+                        default_segment = {
+                            "Stages": [make_stage(1, [])],
+                            "PossibleSegmentInfo": {
+                                "VIPRange": "1-10+"
+                            }
+                        }
+                        st.session_state.current_event_segments = {"Default": default_segment}
+                    
+                    # Собираем entry_types (пустой список по умолчанию)
+                    entry_types = []
+                    
+                    # Создаем событие с текущими параметрами
+                    ev = make_node_event(
+                        event_id=event_id,
+                        min_level=int(min_level),
+                        segment=segment,
+                        asset_bundle_path=asset_bundle,
+                        blocker_prefab_path=blocker,
+                        roundel_prefab_path=roundel,
+                        event_card_prefab_path=event_card,
+                        node_completion_prefab_path=node_completion,
+                        content_key=content_key,
+                        number_of_repeats=int(repeats),
+                        starting_event_currency=float(start_currency),
+                        is_currency_event=bool(is_currency_event),
+                        time_warning_iso=time_warning,
+                        entry_types=entry_types,
+                        segments=st.session_state.current_event_segments,
+                    )
+                    
+                    if st.session_state.editing_event_idx >= 0:
+                        # Обновляем существующее событие
+                        st.session_state.cfg["Events"][st.session_state.editing_event_idx] = ev
+                        st.success(f"✅ Событие {event_id} обновлено с {len(st.session_state.current_event_segments)} сегментом")
+                    else:
+                        # Добавляем новое событие
+                        st.session_state.cfg["Events"].append(ev)
+                        st.success(f"✅ Добавлено новое событие {event_id} с {len(st.session_state.current_event_segments)} сегментом")
+                    
+                    # Очищаем временные данные, но оставляем событие в списке
+                    st.session_state.current_event_segments = {}
+                    st.session_state.current_editing_segment = None
+                    st.session_state.current_editing_nodes = []
+                    st.session_state.editing_event_idx = -1
+                    st.session_state.temp_rewards = []
+                    st.session_state.temp_goal = None
+                    st.session_state.progress_rewards = []
+                    st.session_state.progress_goal = None
+                    
+                    # Переключаемся на вкладку 3 для просмотра структуры
+                    st.info("✅ Событие создано! Переключитесь на вкладку 'Структура и сохранение' для просмотра")
+            
+            with col_create_btn2:
+                if st.button("➕ СОЗДАТЬ СЕГМЕНТ ПО УМОЛЧАНИЮ", use_container_width=True):
+                    if "Default" not in st.session_state.current_event_segments:
+                        st.session_state.current_event_segments["Default"] = {
+                            "Stages": [make_stage(1, [])],
+                            "PossibleSegmentInfo": {
+                                "VIPRange": "1-10+"
+                            }
+                        }
+                        st.success("✅ Сегмент 'Default' создан")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ Сегмент 'Default' уже существует")
                
         with st.expander("📋 Сегменты", expanded=True):
             
@@ -1553,7 +1550,7 @@ with tab2:
                     with col1:
                         display_event_structure(event)
                     with col2:
-                        if st.button(f"✏️ Редактировать", key=f"edit_event_{idx}"):
+                        if st.button(f"✏️", key=f"edit_event_{idx}"):
                             # Загружаем событие для редактирования
                             event_data = event['PossibleNodeEventData']
                             segments = event_data.get('Segments', {})
@@ -1604,7 +1601,7 @@ with tab2:
                             
                             st.success(f"✅ Событие загружено для редактирования. Перейдите на вкладку 'Настройка события'")
                     with col3:
-                        if st.button(f"❌ Удалить", key=f"del_event_{idx}"):
+                        if st.button(f"❌ ", key=f"del_event_{idx}"):
                             st.session_state.cfg["Events"].pop(idx)
                             st.rerun()
         else:
