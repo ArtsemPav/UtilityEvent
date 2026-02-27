@@ -321,7 +321,30 @@ def display_event_structure(event, event_idx=None):
             st.rerun()
     with col_event3:
         if st.button(f"❌", key=f"del_event_{event_idx}", help=f"Удалить событие {event_data['EventID']}"):
+            # Удаляем событие
             st.session_state.cfg["Events"].pop(event_idx)
+            
+            # Обновляем current_event_idx если нужно
+            if st.session_state.current_event_idx >= len(st.session_state.cfg["Events"]):
+                if len(st.session_state.cfg["Events"]) > 0:
+                    st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
+                else:
+                    st.session_state.current_event_idx = -1
+                    st.session_state.current_segment_name = ""
+                    st.session_state.creation_mode = "event"
+            
+            # Сбрасываем режимы редактирования
+            st.session_state.is_editing = False
+            st.session_state.is_editing_segment = False
+            st.session_state.is_editing_node = False
+            st.session_state.editing_event_data = None
+            st.session_state.editing_segment_data = None
+            st.session_state.editing_segment_name = None
+            st.session_state.editing_node_data = None
+            st.session_state.editing_node_type = None
+            st.session_state.editing_node_index = -1
+            
+            st.success(f"✅ Событие удалено")
             st.rerun()
     
     # Отображаем все сегменты
@@ -385,6 +408,10 @@ def display_event_structure(event, event_idx=None):
                             st.session_state.current_editing_nodes = []
                     else:
                         st.session_state.current_editing_nodes = []
+                    
+                    # Добавим отладочную информацию
+                    st.write(f"Debug: Установлены edit_segment_name = {segment_name}")
+                    st.write(f"Debug: Установлены edit_vip_range = {st.session_state.edit_vip_range}")
                     
                     st.success(f"✅ Сегмент '{segment_name}' загружен для редактирования. Перейдите на вкладку 'Настройка события'")
                     st.rerun()
@@ -985,6 +1012,14 @@ def process_multiline_custom_texts(text: str) -> list[str]:
     # Разделяем по строкам, удаляем пустые и обрезаем пробелы
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     return lines
+    
+def get_current_event_safe():
+    """Безопасно возвращает текущее событие или None"""
+    if (st.session_state.cfg["Events"] and 
+        st.session_state.current_event_idx >= 0 and 
+        st.session_state.current_event_idx < len(st.session_state.cfg["Events"])):
+        return st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]
+    return None
 
 st.set_page_config(page_title="LiveEvent JSON Builder", layout="wide")
 st.title("🎮 LiveEvent JSON Builder")
@@ -1021,7 +1056,7 @@ if 'last_progress_reward_count' not in st.session_state:
 if "current_segment_name" not in st.session_state:
     st.session_state.current_segment_name = ""
 
-# Новые переменные для редактирования
+# Новые переменные для редактирования события
 if "editing_event_data" not in st.session_state:
     st.session_state.editing_event_data = None
 if "is_editing" not in st.session_state:
@@ -1134,9 +1169,19 @@ with tab2:
             st.info("📊 Нет событий")
     
     with col_status2:
-        if st.session_state.current_event_idx >= 0:
+        if st.session_state.current_event_idx >= 0 and st.session_state.current_event_idx < len(st.session_state.cfg["Events"]):
             event_name = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]["EventID"]
             st.info(f"✏️ Текущее событие: {event_name}")
+        else:
+            # Если индекс невалидный, сбрасываем его
+            if st.session_state.cfg["Events"]:
+                st.session_state.current_event_idx = 0
+                event_name = st.session_state.cfg["Events"][0]["PossibleNodeEventData"]["EventID"]
+                st.info(f"✏️ Текущее событие: {event_name}")
+            else:
+                st.info("✏️ Нет текущего события")
+                st.session_state.current_event_idx = -1
+                st.session_state.current_segment_name = ""
     
     with col_status3:
         mode_text = "Редактирование события" if st.session_state.is_editing else \
@@ -1269,7 +1314,7 @@ with tab2:
                 st.rerun()
         
         # ===== ШАГ 2: СОЗДАНИЕ СЕГМЕНТА =====
-        if st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0:
+        if st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0 and st.session_state.current_event_idx < len(st.session_state.cfg["Events"]):
             # Определяем, должен ли expander для сегмента быть развернут
             should_expand_segment = (
                 st.session_state.creation_mode == "segment" or
@@ -1293,13 +1338,46 @@ with tab2:
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    # Используем значения из session_state если есть редактирование
-                    default_segment_name = st.session_state.get('edit_segment_name', 'VIP1_10')
-                    segment_name = st.text_input("Имя сегмента", value=default_segment_name, key="segment_name_edit" if st.session_state.is_editing_segment else "segment_name")
+                    # Определяем значение по умолчанию для имени сегмента
+                    if st.session_state.is_editing_segment:
+                        # Если редактируем, берем из edit_segment_name
+                        default_segment_name = st.session_state.get('edit_segment_name', 'VIP1_10')
+                    elif st.session_state.get('edit_segment_name'):
+                        # Если есть временные данные (например, после неудачного сохранения)
+                        default_segment_name = st.session_state.edit_segment_name
+                    else:
+                        # Иначе стандартное значение
+                        default_segment_name = 'VIP1_10'
+                    
+                    segment_name = st.text_input(
+                        "Имя сегмента", 
+                        value=default_segment_name, 
+                        key="segment_name_edit" if st.session_state.is_editing_segment else "segment_name"
+                    )
                 
                 with col2:
-                    default_vip_range = st.session_state.get('edit_vip_range', '1-10+')
-                    vip_range = st.text_input("VIP Range", value=default_vip_range, key="vip_range_edit" if st.session_state.is_editing_segment else "vip_range")
+                    # Определяем значение по умолчанию для VIP диапазона
+                    if st.session_state.is_editing_segment:
+                        # Если редактируем, берем из edit_vip_range
+                        default_vip_range = st.session_state.get('edit_vip_range', '1-10+')
+                    elif st.session_state.get('edit_vip_range'):
+                        # Если есть временные данные
+                        default_vip_range = st.session_state.edit_vip_range
+                    else:
+                        # Иначе стандартное значение
+                        default_vip_range = '1-10+'
+                    
+                    vip_range = st.text_input(
+                        "VIP Range", 
+                        value=default_vip_range, 
+                        key="vip_range_edit" if st.session_state.is_editing_segment else "vip_range"
+                    )
+                
+                # Добавим отладочную информацию (можно удалить после проверки)
+                if st.session_state.is_editing_segment:
+                    st.caption(f"Debug: Редактирование сегмента {st.session_state.editing_segment_name}")
+                    st.caption(f"Debug: edit_segment_name = {st.session_state.get('edit_segment_name', 'None')}")
+                    st.caption(f"Debug: edit_vip_range = {st.session_state.get('edit_vip_range', 'None')}")
                 
                 # Кнопка добавления/сохранения сегмента
                 if st.session_state.is_editing_segment:
@@ -1372,6 +1450,7 @@ with tab2:
         
         # ===== ШАГ 3: СОЗДАНИЕ НОДЫ =====
         if (st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0 and 
+            st.session_state.current_event_idx < len(st.session_state.cfg["Events"]) and
             st.session_state.current_segment_name):
             
             current_event = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]
