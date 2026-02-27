@@ -272,7 +272,7 @@ def make_stage(stage_id: int, nodes: list) -> dict:
     """Создает стадию с указанным ID и списком нод"""
     return {"StageID": stage_id, "Nodes": nodes}
 
-def make_segment(segment_name: str, vip_range: str) -> dict:  # <-- Переместите сюда
+def make_segment(segment_name: str, vip_range: str) -> dict:
     """Создает новый сегмент с пустой стадией"""
     return {
         segment_name: {
@@ -291,59 +291,37 @@ def display_event_structure(event, event_idx=None):
     with col_event1:
         st.write(f"📦 **Событие:** {event_data['EventID']}")
     with col_event2:
-        if st.button(f"✏️", key=f"edit_event_{idx}", help=f"Редактировать событие {event_data['EventID']}"):
+        if st.button(f"✏️", key=f"edit_event_{event_idx}", help=f"Редактировать событие {event_data['EventID']}"):
             # Загружаем событие для редактирования
-            event_data = event['PossibleNodeEventData']
-            segments = event_data.get('Segments', {})
+            st.session_state.editing_event_data = deepcopy(event_data)
+            st.session_state.editing_event_idx = event_idx
+            st.session_state.is_editing = True
+            st.session_state.is_editing_segment = False
+            st.session_state.is_editing_node = False
+            st.session_state.creation_mode = "event"
+            st.session_state.force_expand_event = True
             
-            # Преобразуем сегменты в формат для редактирования
-            formatted_segments = {}
-            for seg_name, seg_data in segments.items():
-                if isinstance(seg_data, dict):
-                    # Проверяем, есть ли уже структура с Stages и PossibleSegmentInfo
-                    if "Stages" in seg_data and "PossibleSegmentInfo" in seg_data:
-                        formatted_segments[seg_name] = seg_data
-                    elif "Stages" in seg_data:
-                        # Добавляем PossibleSegmentInfo если его нет
-                        formatted_segments[seg_name] = {
-                            "Stages": seg_data["Stages"],
-                            "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                        }
-                    else:
-                        # Если сегмент в другом формате, создаем правильную структуру
-                        formatted_segments[seg_name] = {
-                            "Stages": seg_data if isinstance(seg_data, list) else [],
-                            "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                        }
-                elif isinstance(seg_data, list):
-                    formatted_segments[seg_name] = {
-                        "Stages": seg_data,
-                        "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                    }
-                else:
-                    formatted_segments[seg_name] = {
-                        "Stages": [], 
-                        "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                    }
-            
-            st.session_state.current_event_segments = formatted_segments
-            st.session_state.current_editing_segment = None
-            st.session_state.current_editing_nodes = []
-            st.session_state.editing_event_idx = idx
-            st.session_state.temp_rewards = []
-            st.session_state.temp_goal = None
-            st.session_state.progress_rewards = []
-            st.session_state.progress_goal = None
-            
-            # Очищаем старые примененные цели
-            for key in list(st.session_state.keys()):
-                if key.startswith("applied_goal_"):
-                    del st.session_state[key]
+            # Заполняем поля значениями из события
+            st.session_state.edit_event_id = event_data['EventID']
+            st.session_state.edit_asset_bundle = event_data['AssetBundlePath']
+            st.session_state.edit_blocker = event_data['BlockerPrefabPath']
+            st.session_state.edit_roundel = event_data['RoundelPrefabPath']
+            st.session_state.edit_event_card = event_data['EventCardPrefabPath']
+            st.session_state.edit_node_completion = event_data['NodeCompletionPrefabPath']
+            st.session_state.edit_content_key = event_data['ContentKey']
+            st.session_state.edit_min_level = event_data['MinLevel']
+            st.session_state.edit_repeats = event_data['NumberOfRepeats']
+            st.session_state.edit_segment = event_data['Segment']
+            st.session_state.edit_time_warning = event_data['TimeWarning']
+            st.session_state.edit_start_currency = event_data['StartingEventCurrency']
+            st.session_state.edit_is_currency = event_data['IsCurrencyEvent']
+            st.session_state.edit_entry_types = ', '.join(event_data.get('EntryTypes', []))
             
             st.success(f"✅ Событие загружено для редактирования. Перейдите на вкладку 'Настройка события'")
+            st.rerun()
     with col_event3:
-        if st.button(f"❌", key=f"del_event_{idx}", help=f"Удалить событие {event_data['EventID']}"):
-            st.session_state.cfg["Events"].pop(idx)
+        if st.button(f"❌", key=f"del_event_{event_idx}", help=f"Удалить событие {event_data['EventID']}"):
+            st.session_state.cfg["Events"].pop(event_idx)
             st.rerun()
     
     # Отображаем все сегменты
@@ -373,37 +351,27 @@ def display_event_structure(event, event_idx=None):
             # Кнопка редактирования сегмента
             if st.button("✏️", key=f"edit_seg_{segment_key}", help=f"Редактировать сегмент {segment_name}"):
                 if event_idx is not None:
-                    # Загружаем сегмент в режим редактирования
+                    # Сохраняем данные сегмента для редактирования
+                    st.session_state.editing_segment_data = deepcopy(segment_data)
+                    st.session_state.editing_segment_name = segment_name
+                    st.session_state.editing_event_idx = event_idx
+                    st.session_state.is_editing_segment = True
+                    st.session_state.is_editing = False
+                    st.session_state.is_editing_node = False
+                    st.session_state.creation_mode = "segment"
+                    st.session_state.force_expand_segment = True
+                    
+                    # Заполняем поля значениями из сегмента
+                    st.session_state.edit_segment_name = segment_name
+                    
+                    # Получаем VIP диапазон
                     if isinstance(segment_data, dict):
-                        if "Stages" in segment_data:
-                            # Сохраняем сегмент с правильной структурой
-                            st.session_state.current_event_segments = {segment_name: deepcopy(segment_data)}
-                        else:
-                            # Если нет Stages, создаем правильную структуру
-                            st.session_state.current_event_segments = {
-                                segment_name: {
-                                    "Stages": segment_data.get('Stages', []) if isinstance(segment_data, dict) else [],
-                                    "PossibleSegmentInfo": segment_data.get('PossibleSegmentInfo', {"VIPRange": "1-10+"})
-                                }
-                            }
-                    elif isinstance(segment_data, list):
-                        st.session_state.current_event_segments = {
-                            segment_name: {
-                                "Stages": segment_data,
-                                "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                            }
-                        }
+                        segment_info = segment_data.get('PossibleSegmentInfo', {})
+                        st.session_state.edit_vip_range = segment_info.get('VIPRange', '1-10+')
                     else:
-                        st.session_state.current_event_segments = {
-                            segment_name: {
-                                "Stages": [],
-                                "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                            }
-                        }
+                        st.session_state.edit_vip_range = '1-10+'
                     
-                    st.session_state.current_editing_segment = segment_name
-                    
-                    # Загружаем ноды из Stage 1
+                    # Загружаем ноды для возможного редактирования
                     stages = []
                     if isinstance(segment_data, dict):
                         stages = segment_data.get('Stages', [])
@@ -418,13 +386,8 @@ def display_event_structure(event, event_idx=None):
                     else:
                         st.session_state.current_editing_nodes = []
                     
-                    st.session_state.editing_event_idx = event_idx
-                    st.session_state.temp_rewards = []
-                    st.session_state.temp_goal = None
-                    st.session_state.progress_rewards = []
-                    st.session_state.progress_goal = None
-                    
                     st.success(f"✅ Сегмент '{segment_name}' загружен для редактирования. Перейдите на вкладку 'Настройка события'")
+                    st.rerun()
         
         with col_seg3:
             # Кнопка удаления сегмента
@@ -467,14 +430,96 @@ def display_event_structure(event, event_idx=None):
                         
                     node_type = list(node_data.keys())[0] if node_data else "Unknown"
                     node_info = node_data.get(node_type, {})
-                    # Контейнер для сегмента с кнопками
+                    # Контейнер для ноды с кнопками
                     col_node1, col_node2, col_node3 = st.columns([3, 1, 1])
                     with col_node1:
                         st.write(f"         🔹 {node_type} (NodeID: {node_info.get('NodeID', 'N/A')}, NextNodeID: {node_info.get('NextNodeID', 'N/A')})")
                     with col_node2:
                         if st.button("✏️", key=f"edit_node_{event_idx}_{segment_name}_{stage_id}_{i}", help=f"Редактировать ноду {node_info.get('NodeID', 'N/A')}"):
-                            # Здесь будет логика редактирования ноды
-                            st.info(f"🔄 Редактирование ноды {node_info.get('NodeID', 'N/A')} будет доступно в следующей версии")                       
+                            # Загружаем данные ноды для редактирования
+                            st.session_state.editing_node_data = deepcopy(node_data)
+                            st.session_state.editing_node_type = node_type
+                            st.session_state.editing_node_index = i
+                            st.session_state.editing_node_stage_id = stage_id
+                            st.session_state.editing_segment_name = segment_name
+                            st.session_state.editing_event_idx = event_idx
+                            st.session_state.is_editing_node = True
+                            st.session_state.is_editing = False
+                            st.session_state.is_editing_segment = False
+                            st.session_state.creation_mode = "node"
+                            st.session_state.force_expand_node = True
+                            st.session_state.current_segment_name = segment_name
+                            
+                            # Загружаем данные ноды в зависимости от типа
+                            if node_type == "ProgressNode":
+                                # Загружаем данные Progress Node
+                                st.session_state.edit_p_node_id = node_info.get('NodeID', 1)
+                                st.session_state.edit_p_next_id = node_info.get('NextNodeID', [2])[0] if node_info.get('NextNodeID') else 2
+                                st.session_state.edit_p_games = ', '.join(node_info.get('GameList', ['AllGames']))
+                                st.session_state.edit_p_minigame = node_info.get('MiniGame', 'FlatReward')
+                                st.session_state.edit_p_button_text = node_info.get('ButtonActionText', 'PLAY NOW!')
+                                st.session_state.edit_p_button_type = node_info.get('ButtonActionType', '')
+                                st.session_state.edit_p_button_data = node_info.get('ButtonActionData', '')
+                                st.session_state.edit_p_is_last = node_info.get('IsLastNode', False)
+                                st.session_state.edit_p_custom_texts = '\n'.join(node_info.get('CustomTexts', []))
+                                st.session_state.edit_p_item_collect = node_info.get('PossibleItemCollect', '')
+                                
+                                # Загружаем MinBet
+                                min_bet = node_info.get('MinBet', {})
+                                if 'FixedMinBet' in min_bet:
+                                    st.session_state.edit_p_minbet_type = "Fixed"
+                                    st.session_state.edit_p_fixed = min_bet['FixedMinBet'].get('MinBet', 250000)
+                                elif 'MinBetVariable' in min_bet:
+                                    st.session_state.edit_p_minbet_type = "Variable"
+                                    var_data = min_bet['MinBetVariable']
+                                    st.session_state.edit_p_var = var_data.get('Variable', 0.8)
+                                    st.session_state.edit_p_min = var_data.get('Min', 25000)
+                                    st.session_state.edit_p_max = var_data.get('Max', 5000000)
+                                
+                                # Загружаем Goal
+                                st.session_state.progress_goal = node_info.get('Goal', get_default_goal())
+                                
+                                # Загружаем Rewards
+                                st.session_state.progress_rewards = node_info.get('Rewards', [get_default_reward()])
+                                
+                            elif node_type == "EntriesNode":
+                                # Загружаем данные Entries Node
+                                st.session_state.edit_e_node_id = node_info.get('NodeID', 1)
+                                st.session_state.edit_e_game = ', '.join(node_info.get('GameList', ['AllGames']))
+                                st.session_state.edit_e_goal = ', '.join(node_info.get('GoalType', ['Spins']))
+                                st.session_state.edit_e_button_text = node_info.get('ButtonActionText', 'PLAY NOW!')
+                                st.session_state.edit_e_button_type = node_info.get('ButtonActionType', '')
+                                st.session_state.edit_e_button_data = node_info.get('ButtonActionData', '')
+                                st.session_state.edit_e_entry_types = ', '.join(node_info.get('EntryTypes', ['MyEvent']))
+                                st.session_state.edit_e_custom_texts = '\n'.join(node_info.get('CustomTexts', []))
+                                st.session_state.edit_e_item_collect = node_info.get('PossibleItemCollect', 'Default')
+                                
+                                # Загружаем MinBet
+                                min_bet = node_info.get('MinBet', {})
+                                if 'FixedMinBet' in min_bet:
+                                    st.session_state.edit_e_minbet_type = "Fixed"
+                                    st.session_state.edit_e_fixed = min_bet['FixedMinBet'].get('MinBet', 250000)
+                                elif 'MinBetVariable' in min_bet:
+                                    st.session_state.edit_e_minbet_type = "Variable"
+                                    var_data = min_bet['MinBetVariable']
+                                    st.session_state.edit_e_var = var_data.get('Variable', 0.8)
+                                    st.session_state.edit_e_min = var_data.get('Min', 25000)
+                                    st.session_state.edit_e_max = var_data.get('Max', 5000000)
+                            
+                            elif node_type == "DummyNode":
+                                # Загружаем данные Dummy Node
+                                st.session_state.edit_d_node_id = node_info.get('NodeID', 1)
+                                next_ids = node_info.get('NextNodeID', [11, 21, 31])
+                                st.session_state.edit_d_next = ', '.join([str(id) for id in next_ids])
+                                st.session_state.edit_d_button_text = node_info.get('ButtonActionText', 'PLAY NOW!')
+                                st.session_state.edit_d_is_choice = node_info.get('IsChoiceEvent', True)
+                                st.session_state.edit_d_custom_texts = '\n'.join(node_info.get('CustomTexts', []))
+                                
+                                # Загружаем Rewards
+                                st.session_state.temp_rewards = node_info.get('Rewards', [])
+                            
+                            st.success(f"✅ Нода {node_info.get('NodeID', 'N/A')} загружена для редактирования")
+                            st.rerun()
                     with col_node3:
                         # Кнопка удаления ноды
                         if st.button("❌", key=f"del_node_{event_idx}_{segment_name}_{stage_id}_{i}", help=f"Удалить ноду {node_info.get('NodeID', 'N/A')}"):
@@ -495,8 +540,6 @@ def display_event_structure(event, event_idx=None):
                             
                             st.success(f"✅ Нода {node_info.get('NodeID', 'N/A')} удалена")
                             st.rerun()
-                        
-
 
 
 def make_minbet_block(prefix="", default_type="Fixed"):
@@ -964,19 +1007,55 @@ if "current_event_idx" not in st.session_state:
 if "creation_mode" not in st.session_state:
     st.session_state.creation_mode = "event"
 if "temp_rewards" not in st.session_state:
-    st.session_state.temp_rewards = [get_default_reward()]  # Изменено
+    st.session_state.temp_rewards = [get_default_reward()]
 if "temp_goal" not in st.session_state:
-    st.session_state.temp_goal = get_default_goal()  # Изменено
+    st.session_state.temp_goal = get_default_goal()
 if "last_node_tab" not in st.session_state:
     st.session_state.last_node_tab = None
 if 'progress_rewards' not in st.session_state:
-    st.session_state.progress_rewards = [get_default_reward()]  # Изменено
+    st.session_state.progress_rewards = [get_default_reward()]
 if 'progress_goal' not in st.session_state:
-    st.session_state.progress_goal = get_default_goal()  # Изменено
+    st.session_state.progress_goal = get_default_goal()
 if 'last_progress_reward_count' not in st.session_state:
     st.session_state.last_progress_reward_count = 0
 if "current_segment_name" not in st.session_state:
     st.session_state.current_segment_name = ""
+
+# Новые переменные для редактирования
+if "editing_event_data" not in st.session_state:
+    st.session_state.editing_event_data = None
+if "is_editing" not in st.session_state:
+    st.session_state.is_editing = False
+if "force_expand_event" not in st.session_state:
+    st.session_state.force_expand_event = False
+
+# Переменные для редактирования сегментов
+if "editing_segment_data" not in st.session_state:
+    st.session_state.editing_segment_data = None
+if "editing_segment_name" not in st.session_state:
+    st.session_state.editing_segment_name = None
+if "is_editing_segment" not in st.session_state:
+    st.session_state.is_editing_segment = False
+if "force_expand_segment" not in st.session_state:
+    st.session_state.force_expand_segment = False
+if "edit_segment_name" not in st.session_state:
+    st.session_state.edit_segment_name = ""
+if "edit_vip_range" not in st.session_state:
+    st.session_state.edit_vip_range = ""
+
+# Переменные для редактирования нод
+if "editing_node_data" not in st.session_state:
+    st.session_state.editing_node_data = None
+if "editing_node_type" not in st.session_state:
+    st.session_state.editing_node_type = None
+if "editing_node_index" not in st.session_state:
+    st.session_state.editing_node_index = -1
+if "editing_node_stage_id" not in st.session_state:
+    st.session_state.editing_node_stage_id = None
+if "is_editing_node" not in st.session_state:
+    st.session_state.is_editing_node = False
+if "force_expand_node" not in st.session_state:
+    st.session_state.force_expand_node = False
 
 
 # Создаем 3 главные вкладки
@@ -1060,43 +1139,96 @@ with tab2:
             st.info(f"✏️ Текущее событие: {event_name}")
     
     with col_status3:
-        st.info(f"📌 Режим: {st.session_state.creation_mode}")
+        mode_text = "Редактирование события" if st.session_state.is_editing else \
+                   "Редактирование сегмента" if st.session_state.is_editing_segment else \
+                   "Редактирование ноды" if st.session_state.is_editing_node else \
+                   "Создание"
+        st.info(f"📌 Режим: {mode_text}")
     
     st.divider()
     
     colwww1, colwww2 =  st.columns(2)
+    
     with colwww1:
         # ===== ШАГ 1: СОЗДАНИЕ СОБЫТИЯ =====
-        with st.expander("📋 ШАГ 1: Создание события", expanded=st.session_state.creation_mode == "event"):
-            st.write("Заполните общие параметры события и нажмите кнопку 'Добавить событие'")
+        # Определяем, должен ли expander быть развернут
+        should_expand_event = (
+            st.session_state.creation_mode == "event" or 
+            st.session_state.is_editing or 
+            st.session_state.force_expand_event
+        )
+        
+        with st.expander("📋 ШАГ 1: Создание события", expanded=should_expand_event):
+            # Сбрасываем флаг после использования
+            if st.session_state.force_expand_event:
+                st.session_state.force_expand_event = False
+            
+            if st.session_state.is_editing:
+                st.write("✏️ **Редактирование события**")
+                if st.session_state.editing_event_data:
+                    st.info(f"Редактируется событие: {st.session_state.editing_event_data['EventID']}")
+            else:
+                st.write("Заполните общие параметры события и нажмите кнопку 'Добавить событие'")
             
             col1, col2 = st.columns(2)
             
             with col1:
-                event_id = st.text_input("EventID", value="MyEvent", key="event_id")
-                asset_bundle = st.text_input("AssetBundlePath", value="_events/MyEvent", key="asset_bundle")
-                blocker = st.text_input("BlockerPrefabPath", value="Dialogs/MyEvent_Dialog", key="blocker")
-                node_completion = st.text_input("NodeCompletionPrefabPath", value="Dialogs/MyEvent_Dialog", key="node_completion")
-                event_card = st.text_input("EventCardPrefabPath", value="", key="event_card")
+                # Используем значения из session_state если есть редактирование
+                default_event_id = st.session_state.get('edit_event_id', 'MyEvent')
+                event_id = st.text_input("EventID", value=default_event_id, key="event_id")
+                
+                default_asset_bundle = st.session_state.get('edit_asset_bundle', '_events/MyEvent')
+                asset_bundle = st.text_input("AssetBundlePath", value=default_asset_bundle, key="asset_bundle")
+                
+                default_blocker = st.session_state.get('edit_blocker', 'Dialogs/MyEvent_Dialog')
+                blocker = st.text_input("BlockerPrefabPath", value=default_blocker, key="blocker")
+                
+                default_node_completion = st.session_state.get('edit_node_completion', 'Dialogs/MyEvent_Dialog')
+                node_completion = st.text_input("NodeCompletionPrefabPath", value=default_node_completion, key="node_completion")
+                
+                default_event_card = st.session_state.get('edit_event_card', '')
+                event_card = st.text_input("EventCardPrefabPath", value=default_event_card, key="event_card")
             
             with col2:
-                roundel = st.text_input("RoundelPrefabPath", value="Roundels/MyEvent_Roundel", key="roundel")
-                content_key = st.text_input("ContentKey", value="MyEvent", key="content_key")
-                min_level = st.number_input("MinLevel", min_value=1, value=1, step=1, key="min_level")
-                repeats = st.number_input("NumberOfRepeats", value=-1, step=1, key="repeats")
-                segment = st.text_input("Segment (основной сегмент)", value="Default", key="segment")
+                default_roundel = st.session_state.get('edit_roundel', 'Roundels/MyEvent_Roundel')
+                roundel = st.text_input("RoundelPrefabPath", value=default_roundel, key="roundel")
+                
+                default_content_key = st.session_state.get('edit_content_key', 'MyEvent')
+                content_key = st.text_input("ContentKey", value=default_content_key, key="content_key")
+                
+                default_min_level = st.session_state.get('edit_min_level', 1)
+                min_level = st.number_input("MinLevel", min_value=1, value=int(default_min_level), step=1, key="min_level")
+                
+                default_repeats = st.session_state.get('edit_repeats', -1)
+                repeats = st.number_input("NumberOfRepeats", value=int(default_repeats), step=1, key="repeats")
+                
+                default_segment = st.session_state.get('edit_segment', 'Default')
+                segment = st.text_input("Segment (основной сегмент)", value=default_segment, key="segment")
             
             col3, col4 = st.columns(2)
             with col3:
-                time_warning = st.text_input("TimeWarning (ISO)", value="2026-02-21T16:00:00Z", key="time_warning")
-                start_currency = st.number_input("StartingEventCurrency", value=0.0, key="start_currency")
+                default_time_warning = st.session_state.get('edit_time_warning', '2026-02-21T16:00:00Z')
+                time_warning = st.text_input("TimeWarning (ISO)", value=default_time_warning, key="time_warning")
+                
+                default_start_currency = st.session_state.get('edit_start_currency', 0.0)
+                start_currency = st.number_input("StartingEventCurrency", value=float(default_start_currency), key="start_currency")
             
             with col4:
-                is_currency_event = st.checkbox("IsCurrencyEvent", value=False, key="is_currency")
-                entry_types = st.text_input("EntryTypes (через запятую)", value="", key="event_entry_types")
+                default_is_currency = st.session_state.get('edit_is_currency', False)
+                is_currency_event = st.checkbox("IsCurrencyEvent", value=bool(default_is_currency), key="is_currency")
+                
+                default_entry_types = st.session_state.get('edit_entry_types', '')
+                entry_types = st.text_input("EntryTypes (через запятую)", value=default_entry_types, key="event_entry_types")
             
-            # Кнопка добавления события
-            if st.button("➕ ДОБАВИТЬ СОБЫТИЕ", use_container_width=True, type="primary"):
+            # Кнопка добавления/сохранения события
+            if st.session_state.is_editing:
+                button_text = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ"
+                button_type = "primary"
+            else:
+                button_text = "➕ ДОБАВИТЬ СОБЫТИЕ"
+                button_type = "primary"
+            
+            if st.button(button_text, use_container_width=True, type=button_type):
                 # Создаем событие
                 ev = make_node_event(
                     event_id=event_id,
@@ -1115,40 +1247,128 @@ with tab2:
                     entry_types=[x.strip() for x in entry_types.split(",") if x.strip()],
                 )
                 
-                # Добавляем в конфиг
-                st.session_state.cfg["Events"].append(ev)
-                st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
-                st.session_state.creation_mode = "segment"
-                st.success(f"✅ Событие {event_id} добавлено! Теперь можно добавлять сегменты")
+                if st.session_state.is_editing:
+                    # Обновляем существующее событие
+                    st.session_state.cfg["Events"][st.session_state.editing_event_idx] = ev
+                    st.session_state.is_editing = False
+                    st.session_state.editing_event_data = None
+                    st.session_state.creation_mode = "event"
+                    st.success(f"✅ Событие {event_id} обновлено!")
+                else:
+                    # Добавляем новое событие
+                    st.session_state.cfg["Events"].append(ev)
+                    st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
+                    st.session_state.creation_mode = "segment"
+                    st.success(f"✅ Событие {event_id} добавлено! Теперь можно добавлять сегменты")
+                
+                # Очищаем временные данные редактирования
+                for key in list(st.session_state.keys()):
+                    if key.startswith('edit_'):
+                        del st.session_state[key]
+                
                 st.rerun()
         
         # ===== ШАГ 2: СОЗДАНИЕ СЕГМЕНТА =====
         if st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0:
-            with st.expander("📁 ШАГ 2: Создание сегмента", expanded=st.session_state.creation_mode == "segment"):
-                st.write("Заполните параметры сегмента и нажмите кнопку 'Добавить сегмент'")
+            # Определяем, должен ли expander для сегмента быть развернут
+            should_expand_segment = (
+                st.session_state.creation_mode == "segment" or
+                st.session_state.is_editing_segment or
+                st.session_state.force_expand_segment
+            )
+            
+            with st.expander("📁 ШАГ 2: Создание сегмента", expanded=should_expand_segment):
+                # Сбрасываем флаг после использования
+                if st.session_state.force_expand_segment:
+                    st.session_state.force_expand_segment = False
                 
                 current_event = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]
-                st.info(f"📦 Текущее событие: {current_event['EventID']}")
+                
+                if st.session_state.is_editing_segment:
+                    st.write(f"✏️ **Редактирование сегмента:** {st.session_state.editing_segment_name}")
+                    st.info(f"Событие: {current_event['EventID']}")
+                else:
+                    st.write("Заполните параметры сегмента и нажмите кнопку 'Добавить сегмент'")
+                    st.info(f"📦 Текущее событие: {current_event['EventID']}")
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    segment_name = st.text_input("Имя сегмента", value="VIP1_10", key="segment_name")
-                with col2:
-                    vip_range = st.text_input("VIP Range", value="1-10+", key="vip_range")
+                    # Используем значения из session_state если есть редактирование
+                    default_segment_name = st.session_state.get('edit_segment_name', 'VIP1_10')
+                    segment_name = st.text_input("Имя сегмента", value=default_segment_name, key="segment_name_edit" if st.session_state.is_editing_segment else "segment_name")
                 
-                # Кнопка добавления сегмента
-                if st.button("➕ ДОБАВИТЬ СЕГМЕНТ", use_container_width=True, type="primary"):
-                    if segment_name in current_event["Segments"]:
-                        st.error(f"❌ Сегмент {segment_name} уже существует!")
+                with col2:
+                    default_vip_range = st.session_state.get('edit_vip_range', '1-10+')
+                    vip_range = st.text_input("VIP Range", value=default_vip_range, key="vip_range_edit" if st.session_state.is_editing_segment else "vip_range")
+                
+                # Кнопка добавления/сохранения сегмента
+                if st.session_state.is_editing_segment:
+                    button_text = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ СЕГМЕНТА"
+                    button_type = "primary"
+                else:
+                    button_text = "➕ ДОБАВИТЬ СЕГМЕНТ"
+                    button_type = "primary"
+                
+                if st.button(button_text, use_container_width=True, type=button_type):
+                    if st.session_state.is_editing_segment:
+                        # Обновляем существующий сегмент
+                        if segment_name != st.session_state.editing_segment_name and segment_name in current_event["Segments"]:
+                            st.error(f"❌ Сегмент {segment_name} уже существует!")
+                        else:
+                            # Получаем текущие данные сегмента
+                            old_segment_name = st.session_state.editing_segment_name
+                            old_segment_data = current_event["Segments"][old_segment_name]
+                            
+                            # Если имя изменилось, удаляем старый и создаем новый
+                            if segment_name != old_segment_name:
+                                # Сохраняем Stages из старого сегмента
+                                stages = old_segment_data.get('Stages', []) if isinstance(old_segment_data, dict) else []
+                                
+                                # Создаем новый сегмент с обновленным именем
+                                new_segment = make_segment(segment_name, vip_range)
+                                
+                                # Копируем Stages из старого сегмента
+                                if stages:
+                                    if isinstance(new_segment[segment_name], dict):
+                                        new_segment[segment_name]['Stages'] = stages
+                                
+                                # Удаляем старый сегмент
+                                del current_event["Segments"][old_segment_name]
+                                # Добавляем новый
+                                current_event["Segments"].update(new_segment)
+                            else:
+                                # Обновляем VIP диапазон существующего сегмента
+                                if isinstance(old_segment_data, dict):
+                                    if 'PossibleSegmentInfo' not in old_segment_data:
+                                        old_segment_data['PossibleSegmentInfo'] = {}
+                                    old_segment_data['PossibleSegmentInfo']['VIPRange'] = vip_range
+                            
+                            st.session_state.current_segment_name = segment_name
+                            st.session_state.is_editing_segment = False
+                            st.session_state.editing_segment_data = None
+                            st.session_state.editing_segment_name = None
+                            st.session_state.creation_mode = "node"
+                            
+                            st.success(f"✅ Сегмент {segment_name} обновлен! Теперь можно добавлять/редактировать ноды")
+                            
+                            # Очищаем временные данные редактирования
+                            for key in list(st.session_state.keys()):
+                                if key.startswith('edit_segment_') or key in ['edit_segment_name', 'edit_vip_range']:
+                                    del st.session_state[key]
+                            
+                            st.rerun()
                     else:
-                        # Создаем сегмент
-                        new_segment = make_segment(segment_name, vip_range)
-                        current_event["Segments"].update(new_segment)
-                        st.session_state.current_segment_name = segment_name
-                        st.session_state.current_segment_vip = vip_range
-                        st.session_state.creation_mode = "node"
-                        st.success(f"✅ Сегмент {segment_name} добавлен! Теперь можно добавлять ноды")
-                        st.rerun()
+                        # Добавляем новый сегмент
+                        if segment_name in current_event["Segments"]:
+                            st.error(f"❌ Сегмент {segment_name} уже существует!")
+                        else:
+                            # Создаем сегмент
+                            new_segment = make_segment(segment_name, vip_range)
+                            current_event["Segments"].update(new_segment)
+                            st.session_state.current_segment_name = segment_name
+                            st.session_state.creation_mode = "node"
+                            st.success(f"✅ Сегмент {segment_name} добавлен! Теперь можно добавлять ноды")
+                            st.rerun()
         
         # ===== ШАГ 3: СОЗДАНИЕ НОДЫ =====
         if (st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0 and 
@@ -1157,37 +1377,125 @@ with tab2:
             current_event = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]
             
             if st.session_state.current_segment_name in current_event["Segments"]:
-                with st.expander("🔧 ШАГ 3: Создание ноды", expanded=st.session_state.creation_mode == "node"):
-                    st.write(f"Добавление ноды в сегмент: **{st.session_state.current_segment_name}**")
+                # Определяем, должен ли expander для ноды быть развернут
+                should_expand_node = (
+                    st.session_state.creation_mode == "node" or
+                    st.session_state.is_editing_node or
+                    st.session_state.force_expand_node
+                )
+                
+                with st.expander("🔧 ШАГ 3: Создание ноды", expanded=should_expand_node):
+                    # Сбрасываем флаг после использования
+                    if st.session_state.force_expand_node:
+                        st.session_state.force_expand_node = False
+                    
+                    if st.session_state.is_editing_node:
+                        st.write(f"✏️ **Редактирование ноды** (Тип: {st.session_state.editing_node_type})")
+                        st.info(f"Сегмент: {st.session_state.current_segment_name}, Событие: {current_event['EventID']}")
+                    else:
+                        st.write(f"Добавление ноды в сегмент: **{st.session_state.current_segment_name}**")
                     
                     # Вкладки для разных типов нод
                     node_tabs = st.tabs(["📊 Progress Node", "🚪 Entries Node", "🎲 Dummy Choice Node"])
                     
                     # Progress Node Tab
                     with node_tabs[0]:
-                        st.subheader("➕ Добавить Progress Node")
+                        st.subheader("➕ Progress Node")
                         
                         # Сброс при переключении на вкладку
-                        if st.session_state.last_node_tab != "progress":
+                        if st.session_state.last_node_tab != "progress" and not st.session_state.is_editing_node:
                             st.session_state.progress_goal = get_default_goal()
                             st.session_state.progress_rewards = [get_default_reward()]
                             st.session_state.last_node_tab = "progress"
                         
                         col1, col2 = st.columns(2)
                         with col1:
-                            node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="p_node_id")
-                            next_id = st.number_input("NextNodeID", min_value=1, value=2, step=1, key="p_next_id")
-                            games = st.text_input("GameList (через запятую)", value="AllGames", key="p_games")
-                            minigame = st.text_input("MiniGame", value="FlatReward", key="minigame")
+                            default_p_node_id = st.session_state.get('edit_p_node_id', 1)
+                            node_id = st.number_input("NodeID", min_value=1, value=int(default_p_node_id), step=1, key="p_node_id_edit" if st.session_state.is_editing_node else "p_node_id")
+                            
+                            default_p_next_id = st.session_state.get('edit_p_next_id', 2)
+                            next_id = st.number_input("NextNodeID", min_value=1, value=int(default_p_next_id), step=1, key="p_next_id_edit" if st.session_state.is_editing_node else "p_next_id")
+                            
+                            default_p_games = st.session_state.get('edit_p_games', 'AllGames')
+                            games = st.text_input("GameList (через запятую)", value=default_p_games, key="p_games_edit" if st.session_state.is_editing_node else "p_games")
+                            
+                            default_p_minigame = st.session_state.get('edit_p_minigame', 'FlatReward')
+                            minigame = st.text_input("MiniGame", value=default_p_minigame, key="minigame_edit" if st.session_state.is_editing_node else "minigame")
                         
                         with col2:
-                            button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_1")
-                            button_type = st.text_input("ButtonActionType", value="", key="btn_2")
-                            button_data = st.text_input("ButtonActionData", value="", key="btn_3")
-                            is_last_node = st.checkbox("IsLastNode", value=False, key="is_last")
+                            default_p_button_text = st.session_state.get('edit_p_button_text', 'PLAY NOW!')
+                            button_text = st.text_input("ButtonActionText", value=default_p_button_text, key="btn_1_edit" if st.session_state.is_editing_node else "btn_1")
+                            
+                            default_p_button_type = st.session_state.get('edit_p_button_type', '')
+                            button_type = st.text_input("ButtonActionType", value=default_p_button_type, key="btn_2_edit" if st.session_state.is_editing_node else "btn_2")
+                            
+                            default_p_button_data = st.session_state.get('edit_p_button_data', '')
+                            button_data = st.text_input("ButtonActionData", value=default_p_button_data, key="btn_3_edit" if st.session_state.is_editing_node else "btn_3")
+                            
+                            default_p_is_last = st.session_state.get('edit_p_is_last', False)
+                            is_last_node = st.checkbox("IsLastNode", value=bool(default_p_is_last), key="is_last_edit" if st.session_state.is_editing_node else "is_last")
                         
                         # MinBet выбор
-                        min_bet = make_minbet_block("P", default_type="Fixed")
+                        min_bet_prefix = "P_edit" if st.session_state.is_editing_node else "P"
+                        default_minbet_type = st.session_state.get('edit_p_minbet_type', 'Fixed')
+                        
+                        st.write("**Тип MinBet:**")
+                        minbet_type = st.radio(
+                            "Выберите тип",
+                            options=["Fixed", "Variable"],
+                            index=0 if default_minbet_type == "Fixed" else 1,
+                            key=f"{min_bet_prefix}_minbet_type",
+                            horizontal=True,
+                            label_visibility="collapsed"
+                        )
+                        
+                        if minbet_type == "Variable":
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                default_var = st.session_state.get('edit_p_var', 0.8)
+                                var = st.number_input(
+                                    f"Variable", 
+                                    value=float(default_var), 
+                                    min_value=0.0, 
+                                    max_value=10.0, 
+                                    step=0.1,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_var"
+                                )
+                            with col2:
+                                default_min = st.session_state.get('edit_p_min', 25000.0)
+                                min_v = st.number_input(
+                                    f"Min", 
+                                    value=float(default_min), 
+                                    min_value=0.0, 
+                                    step=1000.0,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_min"
+                                )
+                            with col3:
+                                default_max = st.session_state.get('edit_p_max', 5000000.0)
+                                max_v = st.number_input(
+                                    f"Max", 
+                                    value=float(default_max), 
+                                    min_value=0.0, 
+                                    step=10000.0,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_max"
+                                )
+                            min_bet = make_minbet_variable(float(var), float(min_v), float(max_v))
+                        else:
+                            col1, _ = st.columns([1, 2])
+                            with col1:
+                                default_fixed = st.session_state.get('edit_p_fixed', 250000.0)
+                                fixed_value = st.number_input(
+                                    f"Fixed MinBet", 
+                                    value=float(default_fixed), 
+                                    min_value=0.0, 
+                                    step=10000.0,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_fixed"
+                                )
+                            min_bet = make_fixed_minbet(float(fixed_value))
                         
                         st.write("---")
                         st.write("**Цель:**")
@@ -1197,10 +1505,14 @@ with tab2:
                             goal = st.session_state.progress_goal
                             goal_types = goal.get('Type', [])
                             goal_type_str = ', '.join(goal_types) if goal_types else "No Type"
-                            st.success(f"✅ Текущая цель (по умолчанию): {goal_type_str}")
+                            
+                            if st.session_state.is_editing_node:
+                                st.success(f"✅ Текущая цель (загружена из редактируемой ноды): {goal_type_str}")
+                            else:
+                                st.success(f"✅ Текущая цель (по умолчанию): {goal_type_str}")
                             
                             st.write("**Изменить цель (если нужно):**")
-                            new_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress")
+                            new_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress_edit" if st.session_state.is_editing_node else "progress")
                             if new_goal is not None:
                                 st.session_state.progress_goal = new_goal
                                 st.rerun()
@@ -1229,38 +1541,47 @@ with tab2:
                                         desc = str(reward)[:50]
                                     st.write(f"  {j+1}. {desc}")
                                 with colr2:
-                                    if st.button("✏️", key=f"edit_reward_progress_{j}"):
+                                    if st.button("✏️", key=f"edit_reward_progress_{j}_edit" if st.session_state.is_editing_node else f"edit_reward_progress_{j}"):
                                         st.info("Редактирование будет доступно позже")
                                 with colr3:
-                                    if st.button("❌", key=f"remove_reward_progress_{j}"):
+                                    if st.button("❌", key=f"remove_reward_progress_{j}_edit" if st.session_state.is_editing_node else f"remove_reward_progress_{j}"):
                                         st.session_state.progress_rewards.pop(j)
                                         st.rerun()
                         else:
                             st.info("📭 Награды не добавлены")
-                            st.session_state.progress_rewards = [get_default_reward()]
-                            st.rerun()
+                            if not st.session_state.is_editing_node:
+                                st.session_state.progress_rewards = [get_default_reward()]
+                                st.rerun()
                         
                         # Добавление новой награды
                         with st.expander("➕ Добавить дополнительную награду"):
-                            new_reward = reward_creator_block("P", reward_index=f"progress_extra")
+                            new_reward = reward_creator_block("P", reward_index=f"progress_extra_edit" if st.session_state.is_editing_node else "progress_extra")
                             col_button, _ = st.columns([1, 3])
                             with col_button:
-                                if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra"):
+                                if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra_edit" if st.session_state.is_editing_node else "add_reward_progress_extra"):
                                     if new_reward:
                                         st.session_state.progress_rewards.append(new_reward)
                                         st.rerun()
                         
+                        default_p_custom_texts = st.session_state.get('edit_p_custom_texts', 'SPIN\n##\nTIMES')
                         custom_texts = st.text_area(
                             "CustomTexts (каждая строка - отдельный текст)", 
-                            value="SPIN\n##\nTIMES", 
+                            value=default_p_custom_texts, 
                             height=None,
-                            key="p_ct",
+                            key="p_ct_edit" if st.session_state.is_editing_node else "p_ct",
                             help="Вводите каждый текст с новой строки"
                         )
-                        item_collect = st.text_input("PossibleItemCollect (optional)", value="", key="p_ic")
                         
-                        # Кнопка добавления ноды
-                        if st.button("➕ ДОБАВИТЬ PROGRESS NODE", key="add_progress", use_container_width=True, type="primary"):
+                        default_p_item_collect = st.session_state.get('edit_p_item_collect', '')
+                        item_collect = st.text_input("PossibleItemCollect (optional)", value=default_p_item_collect, key="p_ic_edit" if st.session_state.is_editing_node else "p_ic")
+                        
+                        # Кнопка добавления/сохранения ноды
+                        if st.session_state.is_editing_node and st.session_state.editing_node_type == "ProgressNode":
+                            button_text_node = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ PROGRESS NODE"
+                        else:
+                            button_text_node = "➕ ДОБАВИТЬ PROGRESS NODE"
+                        
+                        if st.button(button_text_node, key="add_progress_edit" if st.session_state.is_editing_node else "add_progress", use_container_width=True, type="primary"):
                             if st.session_state.progress_goal is None:
                                 st.warning("⚠️ Цель не установлена, используется по умолчанию")
                                 st.session_state.progress_goal = get_default_goal()
@@ -1287,49 +1608,150 @@ with tab2:
                                 possible_item_collect=item_collect.strip(),
                             )
                             
-                            # Добавляем ноду в сегмент
-                            segment_data = current_event["Segments"][st.session_state.current_segment_name]
-                            if segment_data["Stages"]:
-                                segment_data["Stages"][0]["Nodes"].append(node)
+                            if st.session_state.is_editing_node and st.session_state.editing_node_type == "ProgressNode":
+                                # Обновляем существующую ноду
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    nodes_list = segment_data["Stages"][0]["Nodes"]
+                                    nodes_list[st.session_state.editing_node_index] = node
+                                    
+                                st.session_state.is_editing_node = False
+                                st.session_state.editing_node_data = None
+                                st.session_state.editing_node_type = None
+                                st.session_state.editing_node_index = -1
+                                st.session_state.creation_mode = "node"
+                                
+                                st.success(f"✅ Progress Node (ID: {node_id}) обновлена в сегменте {st.session_state.current_segment_name}")
                             else:
-                                segment_data["Stages"] = [make_stage(1, [node])]
+                                # Добавляем новую ноду в сегмент
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    segment_data["Stages"][0]["Nodes"].append(node)
+                                else:
+                                    segment_data["Stages"] = [make_stage(1, [node])]
+                                
+                                # Сбрасываем для следующей ноды
+                                st.session_state.progress_rewards = [get_default_reward()]
+                                st.session_state.progress_goal = get_default_goal()
+                                
+                                st.success(f"✅ Progress Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
                             
-                            # Сбрасываем для следующей ноды
-                            st.session_state.progress_rewards = [get_default_reward()]
-                            st.session_state.progress_goal = get_default_goal()
+                            # Очищаем временные данные редактирования
+                            for key in list(st.session_state.keys()):
+                                if key.startswith('edit_p_'):
+                                    del st.session_state[key]
                             
-                            st.success(f"✅ Progress Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
                             st.rerun()
                     
                     # Entries Node Tab
                     with node_tabs[1]:
-                        st.subheader("➕ Добавить Entries Node")
+                        st.subheader("➕ Entries Node")
                         
                         col1, col2 = st.columns(2)
                         with col1:
-                            node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="e_node_id")
-                            game_name = st.text_input("GameName", value="AllGames", key="e_game")
+                            default_e_node_id = st.session_state.get('edit_e_node_id', 1)
+                            node_id = st.number_input("NodeID", min_value=1, value=int(default_e_node_id), step=1, key="e_node_id_edit" if st.session_state.is_editing_node else "e_node_id")
+                            
+                            default_e_game = st.session_state.get('edit_e_game', 'AllGames')
+                            game_name = st.text_input("GameName", value=default_e_game, key="e_game_edit" if st.session_state.is_editing_node else "e_game")
                         
                         with col2:
-                            goal_type = st.text_input("GoalType", value="Spins", key="e_goal")
-                            button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_11")
-                            button_type = st.text_input("ButtonActionType", value="", key="btn_12")
-                            button_data = st.text_input("ButtonActionData", value="", key="btn_13")
+                            default_e_goal = st.session_state.get('edit_e_goal', 'Spins')
+                            goal_type = st.text_input("GoalType", value=default_e_goal, key="e_goal_edit" if st.session_state.is_editing_node else "e_goal")
+                            
+                            default_e_button_text = st.session_state.get('edit_e_button_text', 'PLAY NOW!')
+                            button_text = st.text_input("ButtonActionText", value=default_e_button_text, key="btn_11_edit" if st.session_state.is_editing_node else "btn_11")
+                            
+                            default_e_button_type = st.session_state.get('edit_e_button_type', '')
+                            button_type = st.text_input("ButtonActionType", value=default_e_button_type, key="btn_12_edit" if st.session_state.is_editing_node else "btn_12")
+                            
+                            default_e_button_data = st.session_state.get('edit_e_button_data', '')
+                            button_data = st.text_input("ButtonActionData", value=default_e_button_data, key="btn_13_edit" if st.session_state.is_editing_node else "btn_13")
                         
-                        entry_types_raw = st.text_input("EntryTypes (через запятую)", value="MyEvent", key="e_entry_types")
+                        default_e_entry_types = st.session_state.get('edit_e_entry_types', 'MyEvent')
+                        entry_types_raw = st.text_input("EntryTypes (через запятую)", value=default_e_entry_types, key="e_entry_types_edit" if st.session_state.is_editing_node else "e_entry_types")
                         
-                        min_bet = make_minbet_block("E", default_type="Fixed")
+                        # MinBet выбор
+                        min_bet_prefix = "E_edit" if st.session_state.is_editing_node else "E"
+                        default_minbet_type = st.session_state.get('edit_e_minbet_type', 'Fixed')
                         
+                        st.write("**Тип MinBet:**")
+                        minbet_type = st.radio(
+                            "Выберите тип",
+                            options=["Fixed", "Variable"],
+                            index=0 if default_minbet_type == "Fixed" else 1,
+                            key=f"{min_bet_prefix}_minbet_type",
+                            horizontal=True,
+                            label_visibility="collapsed"
+                        )
+                        
+                        if minbet_type == "Variable":
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                default_var = st.session_state.get('edit_e_var', 0.8)
+                                var = st.number_input(
+                                    f"Variable", 
+                                    value=float(default_var), 
+                                    min_value=0.0, 
+                                    max_value=10.0, 
+                                    step=0.1,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_var"
+                                )
+                            with col2:
+                                default_min = st.session_state.get('edit_e_min', 25000.0)
+                                min_v = st.number_input(
+                                    f"Min", 
+                                    value=float(default_min), 
+                                    min_value=0.0, 
+                                    step=1000.0,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_min"
+                                )
+                            with col3:
+                                default_max = st.session_state.get('edit_e_max', 5000000.0)
+                                max_v = st.number_input(
+                                    f"Max", 
+                                    value=float(default_max), 
+                                    min_value=0.0, 
+                                    step=10000.0,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_max"
+                                )
+                            min_bet = make_minbet_variable(float(var), float(min_v), float(max_v))
+                        else:
+                            col1, _ = st.columns([1, 2])
+                            with col1:
+                                default_fixed = st.session_state.get('edit_e_fixed', 250000.0)
+                                fixed_value = st.number_input(
+                                    f"Fixed MinBet", 
+                                    value=float(default_fixed), 
+                                    min_value=0.0, 
+                                    step=10000.0,
+                                    format="%.2f",
+                                    key=f"{min_bet_prefix}_fixed"
+                                )
+                            min_bet = make_fixed_minbet(float(fixed_value))
+                        
+                        default_e_custom_texts = st.session_state.get('edit_e_custom_texts', '')
                         custom_texts = st.text_area(
                             "CustomTexts (каждая строка - отдельный текст)", 
-                            value="", 
+                            value=default_e_custom_texts, 
                             height=None,
-                            key="e_ct",
+                            key="e_ct_edit" if st.session_state.is_editing_node else "e_ct",
                             help="Вводите каждый текст с новой строки"
                         )
-                        item_collect = st.text_input("PossibleItemCollect", value="Default", key="e_ic")
                         
-                        if st.button("➕ ДОБАВИТЬ ENTRIES NODE", key="add_entries", use_container_width=True, type="primary"):
+                        default_e_item_collect = st.session_state.get('edit_e_item_collect', 'Default')
+                        item_collect = st.text_input("PossibleItemCollect", value=default_e_item_collect, key="e_ic_edit" if st.session_state.is_editing_node else "e_ic")
+                        
+                        # Кнопка добавления/сохранения ноды
+                        if st.session_state.is_editing_node and st.session_state.editing_node_type == "EntriesNode":
+                            button_text_node = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ ENTRIES NODE"
+                        else:
+                            button_text_node = "➕ ДОБАВИТЬ ENTRIES NODE"
+                        
+                        if st.button(button_text_node, key="add_entries_edit" if st.session_state.is_editing_node else "add_entries", use_container_width=True, type="primary"):
                             node = make_entries_node(
                                 node_id=int(node_id),
                                 game_list=[game_name],
@@ -1344,32 +1766,59 @@ with tab2:
                                 possible_item_collect=item_collect.strip() or "Default",
                             )
                             
-                            # Добавляем ноду в сегмент
-                            segment_data = current_event["Segments"][st.session_state.current_segment_name]
-                            if segment_data["Stages"]:
-                                segment_data["Stages"][0]["Nodes"].append(node)
+                            if st.session_state.is_editing_node and st.session_state.editing_node_type == "EntriesNode":
+                                # Обновляем существующую ноду
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    nodes_list = segment_data["Stages"][0]["Nodes"]
+                                    nodes_list[st.session_state.editing_node_index] = node
+                                    
+                                st.session_state.is_editing_node = False
+                                st.session_state.editing_node_data = None
+                                st.session_state.editing_node_type = None
+                                st.session_state.editing_node_index = -1
+                                st.session_state.creation_mode = "node"
+                                
+                                st.success(f"✅ Entries Node (ID: {node_id}) обновлена в сегменте {st.session_state.current_segment_name}")
                             else:
-                                segment_data["Stages"] = [make_stage(1, [node])]
+                                # Добавляем новую ноду в сегмент
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    segment_data["Stages"][0]["Nodes"].append(node)
+                                else:
+                                    segment_data["Stages"] = [make_stage(1, [node])]
+                                
+                                st.success(f"✅ Entries Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
                             
-                            st.success(f"✅ Entries Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                            # Очищаем временные данные редактирования
+                            for key in list(st.session_state.keys()):
+                                if key.startswith('edit_e_'):
+                                    del st.session_state[key]
+                            
                             st.rerun()
                     
                     # Dummy Choice Tab
                     with node_tabs[2]:
-                        st.subheader("➕ Добавить Dummy Choice Node")
+                        st.subheader("➕ Dummy Choice Node")
                         
-                        if st.session_state.last_node_tab != "dummy":
+                        if st.session_state.last_node_tab != "dummy" and not st.session_state.is_editing_node:
                             st.session_state.last_node_tab = "dummy"
                             st.session_state.temp_rewards = []
                         
                         col1, col2 = st.columns(2)
                         with col1:
-                            node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="d_node_id")
-                            next_ids_raw = st.text_input("NextNodeID (через запятую)", value="11,21,31", key="d_next")
+                            default_d_node_id = st.session_state.get('edit_d_node_id', 1)
+                            node_id = st.number_input("NodeID", min_value=1, value=int(default_d_node_id), step=1, key="d_node_id_edit" if st.session_state.is_editing_node else "d_node_id")
+                            
+                            default_d_next = st.session_state.get('edit_d_next', '11,21,31')
+                            next_ids_raw = st.text_input("NextNodeID (через запятую)", value=default_d_next, key="d_next_edit" if st.session_state.is_editing_node else "d_next")
                         
                         with col2:
-                            button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="d_btn")
-                            is_choice = st.checkbox("IsChoiceEvent", value=True, key="d_choice")
+                            default_d_button_text = st.session_state.get('edit_d_button_text', 'PLAY NOW!')
+                            button_text = st.text_input("ButtonActionText", value=default_d_button_text, key="d_btn_edit" if st.session_state.is_editing_node else "d_btn")
+                            
+                            default_d_is_choice = st.session_state.get('edit_d_is_choice', True)
+                            is_choice = st.checkbox("IsChoiceEvent", value=bool(default_d_is_choice), key="d_choice_edit" if st.session_state.is_editing_node else "d_choice")
                         
                         st.write("---")
                         st.write("**Награды:**")
@@ -1382,7 +1831,7 @@ with tab2:
                                     desc = f"Fixed: 0 Chips"
                                     st.write(f"  {j+1}. {desc}")
                                 with colr2:
-                                    if st.button("❌", key=f"remove_reward_d_{j}"):
+                                    if st.button("❌", key=f"remove_reward_d_{j}_edit" if st.session_state.is_editing_node else f"remove_reward_d_{j}"):
                                         st.session_state.temp_rewards.pop(j)
                                         st.rerun()
                         else:
@@ -1392,20 +1841,27 @@ with tab2:
                             st.write("**Фиксированная награда:** 0 Chips")
                             col_button, _ = st.columns([1, 3])
                             with col_button:
-                                if st.button("➕ Добавить эту награду в список", key="add_reward_d"):
+                                if st.button("➕ Добавить эту награду в список", key="add_reward_d_edit" if st.session_state.is_editing_node else "add_reward_d"):
                                     fixed_reward = {"FixedReward": {"Currency": "Chips", "Amount": 0}}
                                     st.session_state.temp_rewards.append(fixed_reward)
                                     st.rerun()
                         
+                        default_d_custom_texts = st.session_state.get('edit_d_custom_texts', '')
                         custom_texts = st.text_area(
                             "CustomTexts (каждая строка - отдельный текст)", 
-                            value="", 
+                            value=default_d_custom_texts, 
                             height=None,
-                            key="d_ct",
+                            key="d_ct_edit" if st.session_state.is_editing_node else "d_ct",
                             help="Вводите каждый текст с новой строки"
                         )
                         
-                        if st.button("➕ ДОБАВИТЬ DUMMY NODE", key="add_dummy", use_container_width=True, type="primary"):
+                        # Кнопка добавления/сохранения ноды
+                        if st.session_state.is_editing_node and st.session_state.editing_node_type == "DummyNode":
+                            button_text_node = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ DUMMY NODE"
+                        else:
+                            button_text_node = "➕ ДОБАВИТЬ DUMMY NODE"
+                        
+                        if st.button(button_text_node, key="add_dummy_edit" if st.session_state.is_editing_node else "add_dummy", use_container_width=True, type="primary"):
                             if not st.session_state.temp_rewards:
                                 st.warning("⚠️ Добавьте хотя бы одну награду")
                             else:
@@ -1433,15 +1889,36 @@ with tab2:
                                     is_choice_event=bool(is_choice),
                                 )
                                 
-                                # Добавляем ноду в сегмент
-                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
-                                if segment_data["Stages"]:
-                                    segment_data["Stages"][0]["Nodes"].append(node)
+                                if st.session_state.is_editing_node and st.session_state.editing_node_type == "DummyNode":
+                                    # Обновляем существующую ноду
+                                    segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                    if segment_data["Stages"]:
+                                        nodes_list = segment_data["Stages"][0]["Nodes"]
+                                        nodes_list[st.session_state.editing_node_index] = node
+                                        
+                                    st.session_state.is_editing_node = False
+                                    st.session_state.editing_node_data = None
+                                    st.session_state.editing_node_type = None
+                                    st.session_state.editing_node_index = -1
+                                    st.session_state.creation_mode = "node"
+                                    
+                                    st.success(f"✅ Dummy Node (ID: {node_id}) обновлена в сегменте {st.session_state.current_segment_name}")
                                 else:
-                                    segment_data["Stages"] = [make_stage(1, [node])]
+                                    # Добавляем новую ноду в сегмент
+                                    segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                    if segment_data["Stages"]:
+                                        segment_data["Stages"][0]["Nodes"].append(node)
+                                    else:
+                                        segment_data["Stages"] = [make_stage(1, [node])]
+                                    
+                                    st.session_state.temp_rewards = []
+                                    st.success(f"✅ Dummy Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
                                 
-                                st.session_state.temp_rewards = []
-                                st.success(f"✅ Dummy Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                                # Очищаем временные данные редактирования
+                                for key in list(st.session_state.keys()):
+                                    if key.startswith('edit_d_'):
+                                        del st.session_state[key]
+                                
                                 st.rerun()
         
         # Кнопки управления
@@ -1457,13 +1934,79 @@ with tab2:
                 st.session_state.temp_goal = None
                 st.session_state.progress_rewards = []
                 st.session_state.progress_goal = None
+                st.session_state.is_editing = False
+                st.session_state.is_editing_segment = False
+                st.session_state.is_editing_node = False
+                st.session_state.editing_event_data = None
+                st.session_state.editing_segment_data = None
+                st.session_state.editing_segment_name = None
+                st.session_state.editing_node_data = None
+                st.session_state.editing_node_type = None
+                st.session_state.editing_node_index = -1
+                st.session_state.force_expand_event = False
+                st.session_state.force_expand_segment = False
+                st.session_state.force_expand_node = False
+                # Очищаем временные данные редактирования
+                for key in list(st.session_state.keys()):
+                    if key.startswith('edit_'):
+                        del st.session_state[key]
                 st.rerun()
         
         with col_reset2:
             if st.button("➕ Добавить еще сегмент", use_container_width=True):
                 if st.session_state.current_event_idx >= 0:
+                    # Если были в режиме редактирования сегмента, выходим из него
+                    st.session_state.is_editing_segment = False
+                    st.session_state.editing_segment_data = None
+                    st.session_state.editing_segment_name = None
                     st.session_state.creation_mode = "segment"
                     st.rerun()
+        
+        # Кнопка отмены редактирования (если в режиме редактирования)
+        if st.session_state.is_editing:
+            if st.button("❌ Отменить редактирование события", use_container_width=True):
+                st.session_state.is_editing = False
+                st.session_state.editing_event_data = None
+                st.session_state.creation_mode = "event"
+                st.session_state.force_expand_event = False
+                # Очищаем временные данные редактирования
+                for key in list(st.session_state.keys()):
+                    if key.startswith('edit_'):
+                        del st.session_state[key]
+                st.rerun()
+        
+        # Кнопка отмены редактирования сегмента (если в режиме редактирования)
+        if st.session_state.is_editing_segment:
+            if st.button("❌ Отменить редактирование сегмента", use_container_width=True):
+                st.session_state.is_editing_segment = False
+                st.session_state.editing_segment_data = None
+                st.session_state.editing_segment_name = None
+                st.session_state.creation_mode = "event"
+                st.session_state.force_expand_segment = False
+                # Очищаем временные данные редактирования
+                for key in list(st.session_state.keys()):
+                    if key.startswith('edit_segment_') or key in ['edit_segment_name', 'edit_vip_range']:
+                        del st.session_state[key]
+                st.rerun()
+        
+        # Кнопка отмены редактирования ноды (если в режиме редактирования)
+        if st.session_state.is_editing_node:
+            if st.button("❌ Отменить редактирование ноды", use_container_width=True):
+                st.session_state.is_editing_node = False
+                st.session_state.editing_node_data = None
+                st.session_state.editing_node_type = None
+                st.session_state.editing_node_index = -1
+                st.session_state.creation_mode = "event"
+                st.session_state.force_expand_node = False
+                # Сбрасываем временные данные
+                st.session_state.progress_rewards = [get_default_reward()]
+                st.session_state.progress_goal = get_default_goal()
+                st.session_state.temp_rewards = []
+                # Очищаем временные данные редактирования
+                for key in list(st.session_state.keys()):
+                    if key.startswith('edit_'):
+                        del st.session_state[key]
+                st.rerun()
 
     with colwww2:
         # Отображение всех событий
