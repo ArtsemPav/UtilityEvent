@@ -270,51 +270,219 @@ def make_stage(stage_id: int, nodes: list) -> dict:
     return {"StageID": stage_id, "Nodes": nodes}
 
 
-def display_event_structure(event):
-    """Показывает древовидную структуру события"""
+def display_event_structure(event, event_idx=None):
+    """Показывает древовидную структуру события с кнопками управления сегментами"""
     event_data = event['PossibleNodeEventData']
-    st.write(f"📦 **Событие:** {event_data['EventID']}")
+    # Контейнер для Ивента с кнопками
+    col_event1, col_event2, col_event3 = st.columns([3, 1, 1])
+    with col_event1:
+        st.write(f"📦 **Событие:** {event_data['EventID']}")
+    with col_event2:
+        if st.button(f"✏️", key=f"edit_event_{idx}", help=f"Редактировать событие {event_data['EventID']}"):
+            # Загружаем событие для редактирования
+            event_data = event['PossibleNodeEventData']
+            segments = event_data.get('Segments', {})
+            
+            # Преобразуем сегменты в формат для редактирования
+            formatted_segments = {}
+            for seg_name, seg_data in segments.items():
+                if isinstance(seg_data, dict):
+                    # Проверяем, есть ли уже структура с Stages и PossibleSegmentInfo
+                    if "Stages" in seg_data and "PossibleSegmentInfo" in seg_data:
+                        formatted_segments[seg_name] = seg_data
+                    elif "Stages" in seg_data:
+                        # Добавляем PossibleSegmentInfo если его нет
+                        formatted_segments[seg_name] = {
+                            "Stages": seg_data["Stages"],
+                            "PossibleSegmentInfo": {"VIPRange": "1-10+"}
+                        }
+                    else:
+                        # Если сегмент в другом формате, создаем правильную структуру
+                        formatted_segments[seg_name] = {
+                            "Stages": seg_data if isinstance(seg_data, list) else [],
+                            "PossibleSegmentInfo": {"VIPRange": "1-10+"}
+                        }
+                elif isinstance(seg_data, list):
+                    formatted_segments[seg_name] = {
+                        "Stages": seg_data,
+                        "PossibleSegmentInfo": {"VIPRange": "1-10+"}
+                    }
+                else:
+                    formatted_segments[seg_name] = {
+                        "Stages": [], 
+                        "PossibleSegmentInfo": {"VIPRange": "1-10+"}
+                    }
+            
+            st.session_state.current_event_segments = formatted_segments
+            st.session_state.current_editing_segment = None
+            st.session_state.current_editing_nodes = []
+            st.session_state.editing_event_idx = idx
+            st.session_state.temp_rewards = []
+            st.session_state.temp_goal = None
+            st.session_state.progress_rewards = []
+            st.session_state.progress_goal = None
+            
+            # Очищаем старые примененные цели
+            for key in list(st.session_state.keys()):
+                if key.startswith("applied_goal_"):
+                    del st.session_state[key]
+            
+            st.success(f"✅ Событие загружено для редактирования. Перейдите на вкладку 'Настройка события'")
+    with col_event3:
+        if st.button(f"❌", key=f"del_event_{idx}", help=f"Удалить событие {event_data['EventID']}"):
+            st.session_state.cfg["Events"].pop(idx)
+            st.rerun()
     
     # Отображаем все сегменты
-    for segment_name, segment_data in event_data['Segments'].items():
-        # Получаем VIPRange из PossibleSegmentInfo
-        vip_range = "N/A"
-        if isinstance(segment_data, dict):
-            segment_info = segment_data.get('PossibleSegmentInfo', {})
-            vip_range = segment_info.get('VIPRange', 'N/A')
+    segments = event_data.get('Segments', {})
+    
+    if not segments:
+        st.info("   📭 Нет сегментов в этом событии")
+        return
+    
+    for segment_name, segment_data in segments.items():
+        # Создаем уникальный ключ для сегмента
+        segment_key = f"{event_data['EventID']}_{segment_name}"
         
-        st.write(f"   📁 **Сегмент:** {segment_name} (VIP: {vip_range})")
+        # Контейнер для сегмента с кнопками
+        col_seg1, col_seg2, col_seg3 = st.columns([3, 1, 1])
         
-        # Проверяем тип segment_data
-        if isinstance(segment_data, dict) and 'Stages' in segment_data:
-            # Если это словарь с ключом 'Stages'
-            stages = segment_data['Stages']
-        elif isinstance(segment_data, list):
-            # Если это список стадий напрямую (альтернативный формат)
-            stages = segment_data
-        else:
-            st.warning(f"      ⚠️ Неизвестный формат данных для сегмента {segment_name}")
-            continue
-        
-        # Отображаем стадии
-        for stage in stages:
-            if isinstance(stage, dict):
-                stage_id = stage.get('StageID', 'N/A')
-                nodes = stage.get('Nodes', [])
-            else:
-                st.warning(f"      ⚠️ Неизвестный формат стадии")
-                continue
-                
-            ##st.write(f"      📍 **Stage {stage_id}**")
+        with col_seg1:
+            # Получаем VIPRange из PossibleSegmentInfo
+            vip_range = "N/A"
+            if isinstance(segment_data, dict):
+                segment_info = segment_data.get('PossibleSegmentInfo', {})
+                vip_range = segment_info.get('VIPRange', 'N/A')
             
-            for i, node_data in enumerate(nodes):
-                if not isinstance(node_data, dict):
+            st.write(f"   📁 **Сегмент:** {segment_name} (VIP: {vip_range})")
+        
+        with col_seg2:
+            # Кнопка редактирования сегмента
+            if st.button("✏️", key=f"edit_seg_{segment_key}", help=f"Редактировать сегмент {segment_name}"):
+                if event_idx is not None:
+                    # Загружаем сегмент в режим редактирования
+                    if isinstance(segment_data, dict):
+                        if "Stages" in segment_data:
+                            # Сохраняем сегмент с правильной структурой
+                            st.session_state.current_event_segments = {segment_name: deepcopy(segment_data)}
+                        else:
+                            # Если нет Stages, создаем правильную структуру
+                            st.session_state.current_event_segments = {
+                                segment_name: {
+                                    "Stages": segment_data.get('Stages', []) if isinstance(segment_data, dict) else [],
+                                    "PossibleSegmentInfo": segment_data.get('PossibleSegmentInfo', {"VIPRange": "1-10+"})
+                                }
+                            }
+                    elif isinstance(segment_data, list):
+                        st.session_state.current_event_segments = {
+                            segment_name: {
+                                "Stages": segment_data,
+                                "PossibleSegmentInfo": {"VIPRange": "1-10+"}
+                            }
+                        }
+                    else:
+                        st.session_state.current_event_segments = {
+                            segment_name: {
+                                "Stages": [],
+                                "PossibleSegmentInfo": {"VIPRange": "1-10+"}
+                            }
+                        }
+                    
+                    st.session_state.current_editing_segment = segment_name
+                    
+                    # Загружаем ноды из Stage 1
+                    stages = []
+                    if isinstance(segment_data, dict):
+                        stages = segment_data.get('Stages', [])
+                    elif isinstance(segment_data, list):
+                        stages = segment_data
+                    
+                    if stages and len(stages) > 0:
+                        if isinstance(stages[0], dict):
+                            st.session_state.current_editing_nodes = stages[0].get('Nodes', [])
+                        else:
+                            st.session_state.current_editing_nodes = []
+                    else:
+                        st.session_state.current_editing_nodes = []
+                    
+                    st.session_state.editing_event_idx = event_idx
+                    st.session_state.temp_rewards = []
+                    st.session_state.temp_goal = None
+                    st.session_state.progress_rewards = []
+                    st.session_state.progress_goal = None
+                    
+                    st.success(f"✅ Сегмент '{segment_name}' загружен для редактирования. Перейдите на вкладку 'Настройка события'")
+        
+        with col_seg3:
+            # Кнопка удаления сегмента
+            if st.button("❌", key=f"del_seg_{segment_key}", help=f"Удалить сегмент {segment_name}"):
+                if event_idx is not None:
+                    # Удаляем сегмент
+                    del segments[segment_name]
+                    # Обновляем событие
+                    event['PossibleNodeEventData']['Segments'] = segments
+                    st.success(f"✅ Сегмент '{segment_name}' удален")
+                    st.rerun()
+        
+        # Теперь отображаем содержимое сегмента (стадии и ноды) под ним
+        with st.container():
+            st.write("      ")  # Отступ для содержимого
+            
+            # Проверяем тип segment_data
+            if isinstance(segment_data, dict) and 'Stages' in segment_data:
+                # Если это словарь с ключом 'Stages'
+                stages = segment_data['Stages']
+            elif isinstance(segment_data, list):
+                # Если это список стадий напрямую (альтернативный формат)
+                stages = segment_data
+            else:
+                st.warning(f"      ⚠️ Неизвестный формат данных для сегмента {segment_name}")
+                continue
+            
+            # Отображаем стадии
+            for stage in stages:
+                if isinstance(stage, dict):
+                    stage_id = stage.get('StageID', 'N/A')
+                    nodes = stage.get('Nodes', [])
+                else:
+                    st.warning(f"      ⚠️ Неизвестный формат стадии")
                     continue
                     
-                node_type = list(node_data.keys())[0] if node_data else "Unknown"
-                node_info = node_data.get(node_type, {})
-                
-                st.write(f"      🔹 {node_type} (NodeID: {node_info.get('NodeID', 'N/A')}, NextNodeID: {node_info.get('NextNodeID', 'N/A')})")
+                for i, node_data in enumerate(nodes):
+                    if not isinstance(node_data, dict):
+                        continue
+                        
+                    node_type = list(node_data.keys())[0] if node_data else "Unknown"
+                    node_info = node_data.get(node_type, {})
+                    # Контейнер для сегмента с кнопками
+                    col_node1, col_node2, col_node3 = st.columns([3, 1, 1])
+                    with col_node1:
+                        st.write(f"         🔹 {node_type} (NodeID: {node_info.get('NodeID', 'N/A')}, NextNodeID: {node_info.get('NextNodeID', 'N/A')})")
+                    with col_node2:
+                        if st.button("✏️", key=f"edit_node_{event_idx}_{segment_name}_{stage_id}_{i}", help=f"Редактировать ноду {node_info.get('NodeID', 'N/A')}"):
+                            # Здесь будет логика редактирования ноды
+                            st.info(f"🔄 Редактирование ноды {node_info.get('NodeID', 'N/A')} будет доступно в следующей версии")                       
+                    with col_node3:
+                        # Кнопка удаления ноды
+                        if st.button("❌", key=f"del_node_{event_idx}_{segment_name}_{stage_id}_{i}", help=f"Удалить ноду {node_info.get('NodeID', 'N/A')}"):
+                            # Удаляем ноду из списка
+                            nodes.pop(i)
+                            # Обновляем данные
+                            if isinstance(segment_data, dict) and 'Stages' in segment_data:
+                                for s in segment_data['Stages']:
+                                    if s.get('StageID') == stage_id:
+                                        s['Nodes'] = nodes
+                                        break
+                            elif isinstance(segment_data, list):
+                                # Если сегмент - это список стадий
+                                for s in segment_data:
+                                    if isinstance(s, dict) and s.get('StageID') == stage_id:
+                                        s['Nodes'] = nodes
+                                        break
+                            
+                            st.success(f"✅ Нода {node_info.get('NodeID', 'N/A')} удалена")
+                            st.rerun()
+                        
 
 
 
@@ -763,7 +931,7 @@ def process_multiline_custom_texts(text: str) -> list[str]:
     return lines
 
 st.set_page_config(page_title="LiveEvent JSON Builder", layout="wide")
-st.title("🎮 LiveEvent JSON Builder (Multi-Segment Support with PossibleSegmentInfo)")
+st.title("🎮 LiveEvent JSON Builder")
 
 # Инициализация session state
 if "cfg" not in st.session_state:
@@ -1546,64 +1714,9 @@ with tab2:
             
             for idx, event in enumerate(st.session_state.cfg["Events"]):
                 with st.expander(f"Событие {idx+1}: {event['PossibleNodeEventData']['EventID']}"):
-                    col1, col2, col3 = st.columns([4, 1, 1])
-                    with col1:
-                        display_event_structure(event)
-                    with col2:
-                        if st.button(f"✏️", key=f"edit_event_{idx}"):
-                            # Загружаем событие для редактирования
-                            event_data = event['PossibleNodeEventData']
-                            segments = event_data.get('Segments', {})
-                            
-                            # Преобразуем сегменты в формат для редактирования
-                            formatted_segments = {}
-                            for seg_name, seg_data in segments.items():
-                                if isinstance(seg_data, dict):
-                                    # Проверяем, есть ли уже структура с Stages и PossibleSegmentInfo
-                                    if "Stages" in seg_data and "PossibleSegmentInfo" in seg_data:
-                                        formatted_segments[seg_name] = seg_data
-                                    elif "Stages" in seg_data:
-                                        # Добавляем PossibleSegmentInfo если его нет
-                                        formatted_segments[seg_name] = {
-                                            "Stages": seg_data["Stages"],
-                                            "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                                        }
-                                    else:
-                                        # Если сегмент в другом формате, создаем правильную структуру
-                                        formatted_segments[seg_name] = {
-                                            "Stages": seg_data if isinstance(seg_data, list) else [],
-                                            "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                                        }
-                                elif isinstance(seg_data, list):
-                                    formatted_segments[seg_name] = {
-                                        "Stages": seg_data,
-                                        "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                                    }
-                                else:
-                                    formatted_segments[seg_name] = {
-                                        "Stages": [], 
-                                        "PossibleSegmentInfo": {"VIPRange": "1-10+"}
-                                    }
-                            
-                            st.session_state.current_event_segments = formatted_segments
-                            st.session_state.current_editing_segment = None
-                            st.session_state.current_editing_nodes = []
-                            st.session_state.editing_event_idx = idx
-                            st.session_state.temp_rewards = []
-                            st.session_state.temp_goal = None
-                            st.session_state.progress_rewards = []
-                            st.session_state.progress_goal = None
-                            
-                            # Очищаем старые примененные цели
-                            for key in list(st.session_state.keys()):
-                                if key.startswith("applied_goal_"):
-                                    del st.session_state[key]
-                            
-                            st.success(f"✅ Событие загружено для редактирования. Перейдите на вкладку 'Настройка события'")
-                    with col3:
-                        if st.button(f"❌ ", key=f"del_event_{idx}"):
-                            st.session_state.cfg["Events"].pop(idx)
-                            st.rerun()
+                    # Передаем индекс события для возможности редактирования сегментов
+                    display_event_structure(event, idx)
+                    
         else:
             st.info("📭 Нет сохраненных событий")
 
