@@ -1806,26 +1806,20 @@ with tab2:
                     elif node_type == "EntriesNode":
                         st.subheader("🚪 Entries Node")
                         
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            default_e_node_id = st.session_state.get('edit_e_node_id', 1)
-                            node_id = st.number_input("NodeID", min_value=1, value=int(default_e_node_id), step=1, key="e_node_id_edit" if st.session_state.is_editing_node else "e_node_id")
-                            
-                            default_e_game = st.session_state.get('edit_e_game', 'AllGames')
-                            game_name = st.text_input("GameName", value=default_e_game, key="e_game_edit" if st.session_state.is_editing_node else "e_game")
+                        default_e_game = st.session_state.get('edit_e_game', 'AllGames')
+                        game_name = st.text_input("GameList (через запятую)", value=default_e_game, key="e_game_edit" if st.session_state.is_editing_node else "e_game")
+
+                        default_e_goal = st.session_state.get('edit_e_goal', 'Spins')
+                        goal_type = st.text_input("GoalType", value=default_e_goal, key="e_goal_edit" if st.session_state.is_editing_node else "e_goal")
                         
-                        with col2:
-                            default_e_goal = st.session_state.get('edit_e_goal', 'Spins')
-                            goal_type = st.text_input("GoalType", value=default_e_goal, key="e_goal_edit" if st.session_state.is_editing_node else "e_goal")
-                            
-                            default_e_button_text = st.session_state.get('edit_e_button_text', 'PLAY NOW!')
-                            button_text = st.text_input("ButtonActionText", value=default_e_button_text, key="btn_11_edit" if st.session_state.is_editing_node else "btn_11")
-                            
-                            default_e_button_type = st.session_state.get('edit_e_button_type', '')
-                            button_type = st.text_input("ButtonActionType", value=default_e_button_type, key="btn_12_edit" if st.session_state.is_editing_node else "btn_12")
-                            
-                            default_e_button_data = st.session_state.get('edit_e_button_data', '')
-                            button_data = st.text_input("ButtonActionData", value=default_e_button_data, key="btn_13_edit" if st.session_state.is_editing_node else "btn_13")
+                        default_e_button_text = st.session_state.get('edit_e_button_text', 'PLAY NOW!')
+                        button_text = st.text_input("ButtonActionText", value=default_e_button_text, key="btn_11_edit" if st.session_state.is_editing_node else "btn_11")
+                        
+                        default_e_button_type = st.session_state.get('edit_e_button_type', '')
+                        button_type = st.text_input("ButtonActionType", value=default_e_button_type, key="btn_12_edit" if st.session_state.is_editing_node else "btn_12")
+                        
+                        default_e_button_data = st.session_state.get('edit_e_button_data', '')
+                        button_data = st.text_input("ButtonActionData", value=default_e_button_data, key="btn_13_edit" if st.session_state.is_editing_node else "btn_13")
                         
                         default_e_entry_types = st.session_state.get('edit_e_entry_types', 'MyEvent')
                         entry_types_raw = st.text_input("EntryTypes (через запятую)", value=default_e_entry_types, key="e_entry_types_edit" if st.session_state.is_editing_node else "e_entry_types")
@@ -1912,8 +1906,8 @@ with tab2:
                         
                         if st.button(button_text_node, key="add_entries_edit" if st.session_state.is_editing_node else "add_entries", use_container_width=True, type="primary"):
                             node = make_entries_node(
-                                node_id=int(node_id),
-                                game_list=[game_name],
+                                node_id=1,  # Фиксированное значение 1
+                                game_list=[x.strip() for x in game_name.split(",") if x.strip()],
                                 min_bet=min_bet,
                                 goal_types=[goal_type],
                                 resegment=False,
@@ -1938,7 +1932,7 @@ with tab2:
                                 st.session_state.editing_node_index = -1
                                 st.session_state.creation_mode = "node"
                                 
-                                st.success(f"✅ Entries Node (ID: {node_id}) обновлена в сегменте {st.session_state.current_segment_name}")
+                                st.success(f"✅ Entries Node обновлена в сегменте {st.session_state.current_segment_name}")  # Убрали ID из сообщения
                             else:
                                 # Добавляем новую ноду в сегмент
                                 segment_data = current_event["Segments"][st.session_state.current_segment_name]
@@ -1947,7 +1941,7 @@ with tab2:
                                 else:
                                     segment_data["Stages"] = [make_stage(1, [node])]
                                 
-                                st.success(f"✅ Entries Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                                st.success(f"✅ Entries Node добавлена в сегмент {st.session_state.current_segment_name}")  # Убрали ID из сообщения
                             
                             # Очищаем временные данные редактирования
                             for key in list(st.session_state.keys()):
@@ -1960,38 +1954,11 @@ with tab2:
                     elif node_type == "DummyNode":
                         st.subheader("🎲 Dummy Choice Node")
                         
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            default_d_node_id = st.session_state.get('edit_d_node_id', 1)
-                            node_id = st.number_input("NodeID", min_value=1, value=int(default_d_node_id), step=1, key="d_node_id_edit" if st.session_state.is_editing_node else "d_node_id")
-                            
-                            default_d_next = st.session_state.get('edit_d_next', '11,21,31')
-                            next_ids_raw = st.text_input("NextNodeID (через запятую)", value=default_d_next, key="d_next_edit" if st.session_state.is_editing_node else "d_next")
+                        default_d_node_id = st.session_state.get('edit_d_node_id', 1)
+                        node_id = st.number_input("NodeID", min_value=1, value=int(default_d_node_id), step=1, key="d_node_id_edit" if st.session_state.is_editing_node else "d_node_id")
                         
-                        with col2:
-                            default_d_button_text = st.session_state.get('edit_d_button_text', 'PLAY NOW!')
-                            button_text = st.text_input("ButtonActionText", value=default_d_button_text, key="d_btn_edit" if st.session_state.is_editing_node else "d_btn")
-                            
-                            default_d_is_choice = st.session_state.get('edit_d_is_choice', True)
-                            is_choice = st.checkbox("IsChoiceEvent", value=bool(default_d_is_choice), key="d_choice_edit" if st.session_state.is_editing_node else "d_choice")
-                        
-                        st.write("---")
-                        st.write("**Награда:**")
-                        
-                        # Фиксированная награда для Dummy Node
-                        st.info("💰 Для Dummy Node всегда используется фиксированная награда: 0 Chips")
-                        
-                        # Создаем фиксированную награду
-                        fixed_reward = {"FixedReward": {"Currency": "Chips", "Amount": 0}}
-                        
-                        # Показываем информацию о награде
-                        col_reward1, col_reward2 = st.columns([3, 1])
-                        with col_reward1:
-                            st.write(f"**Тип:** FixedReward")
-                            st.write(f"**Валюта:** Chips")
-                            st.write(f"**Количество:** 0")
-                        
-                        st.write("---")
+                        default_d_next = st.session_state.get('edit_d_next', '11,21,31')
+                        next_ids_raw = st.text_input("NextNodeID (через запятую)", value=default_d_next, key="d_next_edit" if st.session_state.is_editing_node else "d_next")
                         
                         default_d_custom_texts = st.session_state.get('edit_d_custom_texts', '')
                         custom_texts = st.text_area(
@@ -2031,9 +1998,9 @@ with tab2:
                                 contribution_level="Node",
                                 button_action_type="",
                                 button_action_data="",
-                                button_action_text=button_text,
+                                button_action_text="",
                                 custom_texts=process_multiline_custom_texts(custom_texts),
-                                is_choice_event=bool(is_choice),
+                                is_choice_event=True,
                             )
                             
                             if st.session_state.is_editing_node and st.session_state.editing_node_type == "DummyNode":
