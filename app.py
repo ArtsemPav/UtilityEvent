@@ -683,10 +683,7 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
             index=params_index,
             key=f"{unique_key}_params_type"
         )
-    
-    st.write("**Параметры:**")
-    
-    # ИНИЦИАЛИЗИРУЕМ goal_params ЗНАЧЕНИЕМ ПО УМОЛЧАНИЮ
+       
     goal_params = make_fixed_goal(20)  # Значение по умолчанию
     
     if goal_params_type == "SpinpadGoal":
@@ -854,8 +851,6 @@ def goal_creator_block(prefix="", goal_index=0, key_suffix=""):
                 key=f"{unique_key}_fgwl_spin_limiter"
             )
         goal_params = make_fixed_goal_with_spin_limiter_goal(int(target), int(spin_limiter))
-    
-    st.write("---")
     
     # Кнопка применения цели (только одна)
     apply_button = st.button("✅ Применить цель", key=f"{unique_key}_apply", use_container_width=True)
@@ -1491,22 +1486,17 @@ with tab2:
                         st.info(f"Сегмент: {st.session_state.current_segment_name}, Событие: {current_event['EventID']}")
                     else:
                         st.write(f"Добавление ноды в сегмент: **{st.session_state.current_segment_name}**")
-                    
-                    st.write("**Выберите тип ноды:**")
 
                     # Определяем текущий выбранный тип
                     if st.session_state.is_editing_node and st.session_state.editing_node_type:
                         # При редактировании используем тип редактируемой ноды
                         default_node_type = st.session_state.editing_node_type
-                        st.caption(f"Debug: Режим редактирования, тип ноды: {default_node_type}")
                     elif st.session_state.get('selected_node_type'):
                         # Если есть сохраненный выбор
                         default_node_type = st.session_state.selected_node_type
-                        st.caption(f"Debug: Сохраненный выбор: {default_node_type}")
                     else:
                         # По умолчанию ProgressNode
                         default_node_type = 'ProgressNode'
-                        st.caption(f"Debug: По умолчанию: {default_node_type}")
 
                     # Создаем индекс для radio
                     type_index = 0
@@ -1548,8 +1538,6 @@ with tab2:
                                 # Не нужно инициализировать temp_rewards, так как награда фиксирована
                                 pass
                             st.session_state.last_node_type = node_type
-
-                    st.divider()
                     
                     # Progress Node
                     if node_type == "ProgressNode":
@@ -1643,8 +1631,7 @@ with tab2:
                                     key=f"{min_bet_prefix}_fixed"
                                 )
                             min_bet = make_fixed_minbet(float(fixed_value))
-                        
-                        st.write("---")
+
                         st.write("**Цель:**")
 
                         # Отображение текущей цели
@@ -1675,13 +1662,11 @@ with tab2:
                             # Всегда обновляем цель, даже если она не None
                             if new_goal is not None:
                                 st.session_state.progress_goal = new_goal
-                        
-                        st.write("---")
+
                         st.write("**Награды:**")
                         
                         # Отображение текущих наград
                         if st.session_state.progress_rewards:
-                            st.write(f"Добавлено наград: {len(st.session_state.progress_rewards)}")
                             for j, reward in enumerate(st.session_state.progress_rewards):
                                 colr1, colr2, colr3 = st.columns([4, 1, 1])
                                 with colr1:
@@ -1715,12 +1700,11 @@ with tab2:
                         # Добавление новой награды
                         with st.expander("➕ Добавить дополнительную награду"):
                             new_reward = reward_creator_block("P", reward_index=f"progress_extra_edit" if st.session_state.is_editing_node else "progress_extra")
-                            col_button, _ = st.columns([1, 3])
-                            with col_button:
-                                if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra_edit" if st.session_state.is_editing_node else "add_reward_progress_extra"):
-                                    if new_reward:
-                                        st.session_state.progress_rewards.append(new_reward)
-                                        st.rerun()
+                            col_button, _ = st.columns([1, 3])                           
+                            if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra_edit" if st.session_state.is_editing_node else "add_reward_progress_extra"):
+                                if new_reward:
+                                    st.session_state.progress_rewards.append(new_reward)
+                                    st.rerun()
                         
                         default_p_custom_texts = st.session_state.get('edit_p_custom_texts', 'SPIN\n##\nTIMES')
                         custom_texts = st.text_area(
@@ -1731,8 +1715,8 @@ with tab2:
                             help="Вводите каждый текст с новой строки"
                         )
                         
-                        default_p_item_collect = st.session_state.get('edit_p_item_collect', '')
-                        item_collect = st.text_input("PossibleItemCollect (optional)", value=default_p_item_collect, key="p_ic_edit" if st.session_state.is_editing_node else "p_ic")
+                        default_p_item_collect = st.session_state.get('edit_p_item_collect', 'Default')
+                        item_collect = st.text_input("PossibleItemCollect", value=default_p_item_collect, key="p_ic_edit" if st.session_state.is_editing_node else "p_ic")
                         
                         # Кнопка добавления/сохранения ноды
                         if st.session_state.is_editing_node and st.session_state.editing_node_type == "ProgressNode":
@@ -1764,7 +1748,7 @@ with tab2:
                                 button_action_data=button_data,
                                 button_action_text=button_text,
                                 custom_texts=process_multiline_custom_texts(custom_texts),
-                                possible_item_collect=item_collect.strip(),
+                                possible_item_collect=item_collect.strip() or "Default",
                             )
                             
                             if st.session_state.is_editing_node and st.session_state.editing_node_type == "ProgressNode":
