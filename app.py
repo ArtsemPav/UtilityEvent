@@ -325,13 +325,22 @@ def display_event_structure(event, event_idx=None):
             st.session_state.cfg["Events"].pop(event_idx)
             
             # Обновляем current_event_idx если нужно
-            if st.session_state.current_event_idx >= len(st.session_state.cfg["Events"]):
-                if len(st.session_state.cfg["Events"]) > 0:
-                    st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
+            if len(st.session_state.cfg["Events"]) == 0:
+                # Если событий не осталось
+                st.session_state.current_event_idx = -1
+                st.session_state.current_segment_name = ""
+                st.session_state.creation_mode = "event"
+            elif st.session_state.current_event_idx >= len(st.session_state.cfg["Events"]):
+                # Если текущий индекс больше не существует
+                st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
+            elif st.session_state.current_event_idx == event_idx:
+                # Если удалили текущее выбранное событие
+                if event_idx < len(st.session_state.cfg["Events"]):
+                    # Если есть событие на том же индексе (после удаления сдвинулись)
+                    st.session_state.current_event_idx = event_idx
                 else:
-                    st.session_state.current_event_idx = -1
-                    st.session_state.current_segment_name = ""
-                    st.session_state.creation_mode = "event"
+                    # Если нет, берем последнее
+                    st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
             
             # Сбрасываем режимы редактирования
             st.session_state.is_editing = False
@@ -343,6 +352,9 @@ def display_event_structure(event, event_idx=None):
             st.session_state.editing_node_data = None
             st.session_state.editing_node_type = None
             st.session_state.editing_node_index = -1
+            st.session_state.force_expand_event = False
+            st.session_state.force_expand_segment = False
+            st.session_state.force_expand_node = False
             
             st.success(f"✅ Событие удалено")
             st.rerun()
@@ -409,10 +421,6 @@ def display_event_structure(event, event_idx=None):
                     else:
                         st.session_state.current_editing_nodes = []
                     
-                    # Добавим отладочную информацию
-                    st.write(f"Debug: Установлены edit_segment_name = {segment_name}")
-                    st.write(f"Debug: Установлены edit_vip_range = {st.session_state.edit_vip_range}")
-                    
                     st.success(f"✅ Сегмент '{segment_name}' загружен для редактирования. Перейдите на вкладку 'Настройка события'")
                     st.rerun()
         
@@ -476,6 +484,9 @@ def display_event_structure(event, event_idx=None):
                             st.session_state.creation_mode = "node"
                             st.session_state.force_expand_node = True
                             st.session_state.current_segment_name = segment_name
+                            
+                            # Устанавливаем выбранный тип ноды
+                            st.session_state.selected_node_type = node_type
                             
                             # Загружаем данные ноды в зависимости от типа
                             if node_type == "ProgressNode":
@@ -1012,7 +1023,7 @@ def process_multiline_custom_texts(text: str) -> list[str]:
     # Разделяем по строкам, удаляем пустые и обрезаем пробелы
     lines = [line.strip() for line in text.split('\n') if line.strip()]
     return lines
-    
+
 def get_current_event_safe():
     """Безопасно возвращает текущее событие или None"""
     if (st.session_state.cfg["Events"] and 
@@ -1042,7 +1053,7 @@ if "current_event_idx" not in st.session_state:
 if "creation_mode" not in st.session_state:
     st.session_state.creation_mode = "event"
 if "temp_rewards" not in st.session_state:
-    st.session_state.temp_rewards = [get_default_reward()]
+    st.session_state.temp_rewards = []
 if "temp_goal" not in st.session_state:
     st.session_state.temp_goal = get_default_goal()
 if "last_node_tab" not in st.session_state:
@@ -1056,7 +1067,7 @@ if 'last_progress_reward_count' not in st.session_state:
 if "current_segment_name" not in st.session_state:
     st.session_state.current_segment_name = ""
 
-# Новые переменные для редактирования события
+# Новые переменные для редактирования
 if "editing_event_data" not in st.session_state:
     st.session_state.editing_event_data = None
 if "is_editing" not in st.session_state:
@@ -1091,6 +1102,12 @@ if "is_editing_node" not in st.session_state:
     st.session_state.is_editing_node = False
 if "force_expand_node" not in st.session_state:
     st.session_state.force_expand_node = False
+
+# Переменные для выбора типа ноды
+if "last_node_type" not in st.session_state:
+    st.session_state.last_node_type = None
+if "selected_node_type" not in st.session_state:
+    st.session_state.selected_node_type = "ProgressNode"
 
 
 # Создаем 3 главные вкладки
@@ -1373,12 +1390,6 @@ with tab2:
                         key="vip_range_edit" if st.session_state.is_editing_segment else "vip_range"
                     )
                 
-                # Добавим отладочную информацию (можно удалить после проверки)
-                if st.session_state.is_editing_segment:
-                    st.caption(f"Debug: Редактирование сегмента {st.session_state.editing_segment_name}")
-                    st.caption(f"Debug: edit_segment_name = {st.session_state.get('edit_segment_name', 'None')}")
-                    st.caption(f"Debug: edit_vip_range = {st.session_state.get('edit_vip_range', 'None')}")
-                
                 # Кнопка добавления/сохранения сегмента
                 if st.session_state.is_editing_segment:
                     button_text = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ СЕГМЕНТА"
@@ -1474,18 +1485,68 @@ with tab2:
                     else:
                         st.write(f"Добавление ноды в сегмент: **{st.session_state.current_segment_name}**")
                     
-                    # Вкладки для разных типов нод
-                    node_tabs = st.tabs(["📊 Progress Node", "🚪 Entries Node", "🎲 Dummy Choice Node"])
+                    st.write("**Выберите тип ноды:**")
+
+                    # Определяем текущий выбранный тип
+                    if st.session_state.is_editing_node and st.session_state.editing_node_type:
+                        # При редактировании используем тип редактируемой ноды
+                        default_node_type = st.session_state.editing_node_type
+                        st.caption(f"Debug: Режим редактирования, тип ноды: {default_node_type}")
+                    elif st.session_state.get('selected_node_type'):
+                        # Если есть сохраненный выбор
+                        default_node_type = st.session_state.selected_node_type
+                        st.caption(f"Debug: Сохраненный выбор: {default_node_type}")
+                    else:
+                        # По умолчанию ProgressNode
+                        default_node_type = 'ProgressNode'
+                        st.caption(f"Debug: По умолчанию: {default_node_type}")
+
+                    # Создаем индекс для radio
+                    type_index = 0
+                    if default_node_type == "ProgressNode":
+                        type_index = 0
+                    elif default_node_type == "EntriesNode":
+                        type_index = 1
+                    elif default_node_type == "DummyNode":
+                        type_index = 2
+
+                    # Добавим уникальный ключ для radio, который меняется при редактировании
+                    radio_key = f"node_type_selector_{st.session_state.is_editing_node}_{st.session_state.editing_node_index}"
+
+                    node_type = st.radio(
+                        "Тип ноды",
+                        options=["ProgressNode", "EntriesNode", "DummyNode"],
+                        index=type_index,
+                        horizontal=True,
+                        key=radio_key,
+                        label_visibility="collapsed"
+                    )
+
+                    # Сохраняем выбранный тип в session_state
+                    st.session_state.selected_node_type = node_type
+
+                    # Если мы в режиме редактирования, но выбранный тип не совпадает с типом редактируемой ноды,
+                    # обновляем данные для нового типа
+                    if st.session_state.is_editing_node and node_type != st.session_state.editing_node_type:
+                        st.warning(f"⚠️ Вы изменили тип ноды с {st.session_state.editing_node_type} на {node_type}. Данные будут сброшены.")
+                        # Здесь можно добавить логику для сброса данных при смене типа
+
+                    # Сброс данных при переключении типа ноды (только если не в режиме редактирования)
+                    if not st.session_state.is_editing_node:
+                        if st.session_state.last_node_type != node_type:
+                            if node_type == "ProgressNode":
+                                st.session_state.progress_goal = get_default_goal()
+                                st.session_state.progress_rewards = [get_default_reward()]
+                            elif node_type == "DummyNode":
+                                # Не нужно инициализировать temp_rewards, так как награда фиксирована
+                                pass
+                            st.session_state.last_node_type = node_type
+
+                    st.divider()
                     
-                    # Progress Node Tab
-                    with node_tabs[0]:
-                        st.subheader("➕ Progress Node")
-                        
-                        # Сброс при переключении на вкладку
-                        if st.session_state.last_node_tab != "progress" and not st.session_state.is_editing_node:
-                            st.session_state.progress_goal = get_default_goal()
-                            st.session_state.progress_rewards = [get_default_reward()]
-                            st.session_state.last_node_tab = "progress"
+                    # Progress Node
+                    if node_type == "ProgressNode":
+                        st.subheader("📊 Progress Node")
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -1722,9 +1783,9 @@ with tab2:
                             
                             st.rerun()
                     
-                    # Entries Node Tab
-                    with node_tabs[1]:
-                        st.subheader("➕ Entries Node")
+                    # Entries Node
+                    elif node_type == "EntriesNode":
+                        st.subheader("🚪 Entries Node")
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -1876,13 +1937,9 @@ with tab2:
                             
                             st.rerun()
                     
-                    # Dummy Choice Tab
-                    with node_tabs[2]:
-                        st.subheader("➕ Dummy Choice Node")
-                        
-                        if st.session_state.last_node_tab != "dummy" and not st.session_state.is_editing_node:
-                            st.session_state.last_node_tab = "dummy"
-                            st.session_state.temp_rewards = []
+                    # Dummy Choice Node
+                    elif node_type == "DummyNode":
+                        st.subheader("🎲 Dummy Choice Node")
                         
                         col1, col2 = st.columns(2)
                         with col1:
@@ -1900,30 +1957,22 @@ with tab2:
                             is_choice = st.checkbox("IsChoiceEvent", value=bool(default_d_is_choice), key="d_choice_edit" if st.session_state.is_editing_node else "d_choice")
                         
                         st.write("---")
-                        st.write("**Награды:**")
+                        st.write("**Награда:**")
                         
-                        if st.session_state.temp_rewards:
-                            st.write(f"Добавлено наград: {len(st.session_state.temp_rewards)}")
-                            for j, reward in enumerate(st.session_state.temp_rewards):
-                                colr1, colr2 = st.columns([5, 1])
-                                with colr1:
-                                    desc = f"Fixed: 0 Chips"
-                                    st.write(f"  {j+1}. {desc}")
-                                with colr2:
-                                    if st.button("❌", key=f"remove_reward_d_{j}_edit" if st.session_state.is_editing_node else f"remove_reward_d_{j}"):
-                                        st.session_state.temp_rewards.pop(j)
-                                        st.rerun()
-                        else:
-                            st.info("📭 Награды не добавлены")
+                        # Фиксированная награда для Dummy Node
+                        st.info("💰 Для Dummy Node всегда используется фиксированная награда: 0 Chips")
                         
-                        with st.expander("➕ Добавить награду"):
-                            st.write("**Фиксированная награда:** 0 Chips")
-                            col_button, _ = st.columns([1, 3])
-                            with col_button:
-                                if st.button("➕ Добавить эту награду в список", key="add_reward_d_edit" if st.session_state.is_editing_node else "add_reward_d"):
-                                    fixed_reward = {"FixedReward": {"Currency": "Chips", "Amount": 0}}
-                                    st.session_state.temp_rewards.append(fixed_reward)
-                                    st.rerun()
+                        # Создаем фиксированную награду
+                        fixed_reward = {"FixedReward": {"Currency": "Chips", "Amount": 0}}
+                        
+                        # Показываем информацию о награде
+                        col_reward1, col_reward2 = st.columns([3, 1])
+                        with col_reward1:
+                            st.write(f"**Тип:** FixedReward")
+                            st.write(f"**Валюта:** Chips")
+                            st.write(f"**Количество:** 0")
+                        
+                        st.write("---")
                         
                         default_d_custom_texts = st.session_state.get('edit_d_custom_texts', '')
                         custom_texts = st.text_area(
@@ -1941,64 +1990,63 @@ with tab2:
                             button_text_node = "➕ ДОБАВИТЬ DUMMY NODE"
                         
                         if st.button(button_text_node, key="add_dummy_edit" if st.session_state.is_editing_node else "add_dummy", use_container_width=True, type="primary"):
-                            if not st.session_state.temp_rewards:
-                                st.warning("⚠️ Добавьте хотя бы одну награду")
+                            # Всегда используем фиксированную награду
+                            rewards = [fixed_reward]
+                            
+                            next_ids = []
+                            for x in next_ids_raw.split(","):
+                                x = x.strip()
+                                if x:
+                                    try:
+                                        next_ids.append(int(x))
+                                    except:
+                                        pass
+                            
+                            node = make_dummy_choice_node(
+                                node_id=int(node_id),
+                                next_ids=next_ids if next_ids else [11, 21, 31],
+                                rewards=rewards,
+                                is_last=False,
+                                resegment=False,
+                                mini_game="FlatReward",
+                                contribution_level="Node",
+                                button_action_type="",
+                                button_action_data="",
+                                button_action_text=button_text,
+                                custom_texts=process_multiline_custom_texts(custom_texts),
+                                is_choice_event=bool(is_choice),
+                            )
+                            
+                            if st.session_state.is_editing_node and st.session_state.editing_node_type == "DummyNode":
+                                # Обновляем существующую ноду
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    nodes_list = segment_data["Stages"][0]["Nodes"]
+                                    nodes_list[st.session_state.editing_node_index] = node
+                                    
+                                st.session_state.is_editing_node = False
+                                st.session_state.editing_node_data = None
+                                st.session_state.editing_node_type = None
+                                st.session_state.editing_node_index = -1
+                                st.session_state.creation_mode = "node"
+                                
+                                st.success(f"✅ Dummy Node (ID: {node_id}) обновлена в сегменте {st.session_state.current_segment_name}")
                             else:
-                                next_ids = []
-                                for x in next_ids_raw.split(","):
-                                    x = x.strip()
-                                    if x:
-                                        try:
-                                            next_ids.append(int(x))
-                                        except:
-                                            pass
-                                
-                                node = make_dummy_choice_node(
-                                    node_id=int(node_id),
-                                    next_ids=next_ids if next_ids else [11, 21, 31],
-                                    rewards=st.session_state.temp_rewards.copy(),
-                                    is_last=False,
-                                    resegment=False,
-                                    mini_game="FlatReward",
-                                    contribution_level="Node",
-                                    button_action_type="",
-                                    button_action_data="",
-                                    button_action_text=button_text,
-                                    custom_texts=process_multiline_custom_texts(custom_texts),
-                                    is_choice_event=bool(is_choice),
-                                )
-                                
-                                if st.session_state.is_editing_node and st.session_state.editing_node_type == "DummyNode":
-                                    # Обновляем существующую ноду
-                                    segment_data = current_event["Segments"][st.session_state.current_segment_name]
-                                    if segment_data["Stages"]:
-                                        nodes_list = segment_data["Stages"][0]["Nodes"]
-                                        nodes_list[st.session_state.editing_node_index] = node
-                                        
-                                    st.session_state.is_editing_node = False
-                                    st.session_state.editing_node_data = None
-                                    st.session_state.editing_node_type = None
-                                    st.session_state.editing_node_index = -1
-                                    st.session_state.creation_mode = "node"
-                                    
-                                    st.success(f"✅ Dummy Node (ID: {node_id}) обновлена в сегменте {st.session_state.current_segment_name}")
+                                # Добавляем новую ноду в сегмент
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    segment_data["Stages"][0]["Nodes"].append(node)
                                 else:
-                                    # Добавляем новую ноду в сегмент
-                                    segment_data = current_event["Segments"][st.session_state.current_segment_name]
-                                    if segment_data["Stages"]:
-                                        segment_data["Stages"][0]["Nodes"].append(node)
-                                    else:
-                                        segment_data["Stages"] = [make_stage(1, [node])]
-                                    
-                                    st.session_state.temp_rewards = []
-                                    st.success(f"✅ Dummy Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                                    segment_data["Stages"] = [make_stage(1, [node])]
                                 
-                                # Очищаем временные данные редактирования
-                                for key in list(st.session_state.keys()):
-                                    if key.startswith('edit_d_'):
-                                        del st.session_state[key]
-                                
-                                st.rerun()
+                                st.success(f"✅ Dummy Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                            
+                            # Очищаем временные данные редактирования
+                            for key in list(st.session_state.keys()):
+                                if key.startswith('edit_d_'):
+                                    del st.session_state[key]
+                            
+                            st.rerun()
         
         # Кнопки управления
         st.divider()
