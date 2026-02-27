@@ -209,11 +209,14 @@ def make_node_event(event_id: str, min_level: int, segment: str,
                     content_key: str, number_of_repeats: int,
                     starting_event_currency: float, is_currency_event: bool,
                     time_warning_iso: str, entry_types: list[str],
-                    segments: dict) -> dict:
+                    segments: dict = None) -> dict:
     """
     Создает событие с поддержкой множественных сегментов
     """
     # Преобразуем segments в правильный формат, если необходимо
+    # Если segments не передан, создаем пустой словарь
+    if segments is None:
+        segments = {}
     formatted_segments = {}
     for seg_name, seg_data in segments.items():
         if isinstance(seg_data, dict) and "Stages" in seg_data and "PossibleSegmentInfo" in seg_data:
@@ -269,6 +272,16 @@ def make_stage(stage_id: int, nodes: list) -> dict:
     """Создает стадию с указанным ID и списком нод"""
     return {"StageID": stage_id, "Nodes": nodes}
 
+def make_segment(segment_name: str, vip_range: str) -> dict:  # <-- Переместите сюда
+    """Создает новый сегмент с пустой стадией"""
+    return {
+        segment_name: {
+            "Stages": [make_stage(1, [])],
+            "PossibleSegmentInfo": {
+                "VIPRange": vip_range
+            }
+        }
+    }
 
 def display_event_structure(event, event_idx=None):
     """Показывает древовидную структуру события с кнопками управления сегментами"""
@@ -946,6 +959,10 @@ if "current_editing_nodes" not in st.session_state:
     st.session_state.current_editing_nodes = []
 if "editing_event_idx" not in st.session_state:
     st.session_state.editing_event_idx = -1
+if "current_event_idx" not in st.session_state:
+    st.session_state.current_event_idx = -1
+if "creation_mode" not in st.session_state:
+    st.session_state.creation_mode = "event"
 if "temp_rewards" not in st.session_state:
     st.session_state.temp_rewards = [get_default_reward()]  # Изменено
 if "temp_goal" not in st.session_state:
@@ -958,6 +975,8 @@ if 'progress_goal' not in st.session_state:
     st.session_state.progress_goal = get_default_goal()  # Изменено
 if 'last_progress_reward_count' not in st.session_state:
     st.session_state.last_progress_reward_count = 0
+if "current_segment_name" not in st.session_state:
+    st.session_state.current_segment_name = ""
 
 
 # Создаем 3 главные вкладки
@@ -1027,685 +1046,424 @@ with tab1:
 
 # ========== ВКЛАДКА 2: НАСТРОЙКА СОБЫТИЯ ==========
 with tab2:
+    # Отображение текущего состояния
+    col_status1, col_status2, col_status3 = st.columns(3)
+    with col_status1:
+        if st.session_state.cfg["Events"]:
+            st.info(f"📊 Всего событий: {len(st.session_state.cfg['Events'])}")
+        else:
+            st.info("📊 Нет событий")
+    
+    with col_status2:
+        if st.session_state.current_event_idx >= 0:
+            event_name = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]["EventID"]
+            st.info(f"✏️ Текущее событие: {event_name}")
+    
+    with col_status3:
+        st.info(f"📌 Режим: {st.session_state.creation_mode}")
+    
+    st.divider()
+    
     colwww1, colwww2 =  st.columns(2)
     with colwww1:
-        # Управление режимом редактирования
-        col_status, col_action = st.columns([3, 1])
-        with col_status:
-            if st.session_state.editing_event_idx >= 0:
-                st.info(f"✏️ Редактирование события: {st.session_state.cfg['Events'][st.session_state.editing_event_idx]['PossibleNodeEventData']['EventID']}")
-            else:
-                st.info("➕ Создание нового события")
-        
-        with col_action:
-            if st.session_state.editing_event_idx >= 0:
-                if st.button("❌ Отменить редактирование", use_container_width=True):
-                    st.session_state.current_event_segments = {}
-                    st.session_state.current_editing_segment = None
-                    st.session_state.current_editing_nodes = []
-                    st.session_state.editing_event_idx = -1
-                    st.session_state.temp_rewards = []
-                    st.session_state.temp_goal = None
-                    st.rerun()
-        
-        # Общие поля Event
-        with st.expander("📋 Общие параметры", expanded=True):
-            # Если редактируем событие, загружаем его параметры
-            default_event = {}
-            if st.session_state.editing_event_idx >= 0:
-                default_event = st.session_state.cfg['Events'][st.session_state.editing_event_idx]['PossibleNodeEventData']
+        # ===== ШАГ 1: СОЗДАНИЕ СОБЫТИЯ =====
+        with st.expander("📋 ШАГ 1: Создание события", expanded=st.session_state.creation_mode == "event"):
+            st.write("Заполните общие параметры события и нажмите кнопку 'Добавить событие'")
             
-
-            event_id = st.text_input("EventID", 
-                value=default_event.get('EventID', 'MyEvent'), key="event_id")
-            asset_bundle = st.text_input("AssetBundlePath", 
-                value=default_event.get('AssetBundlePath', '_events/MyEvent'), key="asset_bundle")
-            blocker = st.text_input("BlockerPrefabPath", 
-                value=default_event.get('BlockerPrefabPath', 'Dialogs/MyEvent_Dialog'), key="blocker")
-            node_completion = st.text_input("NodeCompletionPrefabPath", 
-                value=default_event.get('NodeCompletionPrefabPath', 'Dialogs/MyEvent_Dialog'), key="node_completion")
-            event_card = st.text_input("EventCardPrefabPath", 
-                    value=default_event.get('EventCardPrefabPath', ''), key="event_card")
-            roundel = st.text_input("RoundelPrefabPath", 
-                value=default_event.get('RoundelPrefabPath', 'Roundels/MyEvent_Roundel'), key="roundel")
-            content_key = st.text_input("ContentKey", 
-                value=default_event.get('ContentKey', 'MyEvent'), key="content_key")                
-            min_level = st.number_input("MinLevel", min_value=1, 
-                value=default_event.get('MinLevel', 1), step=1, key="min_level")
-            repeats = st.number_input("NumberOfRepeats", 
-                value=default_event.get('NumberOfRepeats', -1), step=1, key="repeats")
-            segment = st.text_input("Segment (основной сегмент)", 
-                value=default_event.get('Segment', 'Default'), key="segment")
-            time_warning = st.text_input("TimeWarning (ISO)", 
-                value=default_event.get('TimeWarning', "2026-02-21T16:00:00Z"), key="time_warning")
-            start_currency = st.number_input("StartingEventCurrency", 
-                value=default_event.get('StartingEventCurrency', 0.0), key="start_currency")
-            is_currency_event = st.checkbox("IsCurrencyEvent", 
-                value=default_event.get('IsCurrencyEvent', False), key="is_currency")
+            col1, col2 = st.columns(2)
             
-            # ========== НОВАЯ КНОПКА СОЗДАНИЯ СОБЫТИЯ ==========
-            st.divider()
-            col_create_btn1, col_create_btn2 = st.columns(2)
-            with col_create_btn1:
-                if st.button("✨ БЫСТРОЕ СОЗДАНИЕ СОБЫТИЯ", use_container_width=True, type="primary"):
-                    # Создаем базовое событие с Default сегментом
-                    if not st.session_state.current_event_segments:
-                        # Создаем Default сегмент если его нет
-                        default_segment = {
-                            "Stages": [make_stage(1, [])],
-                            "PossibleSegmentInfo": {
-                                "VIPRange": "1-10+"
-                            }
-                        }
-                        st.session_state.current_event_segments = {"Default": default_segment}
-                    
-                    # Собираем entry_types (пустой список по умолчанию)
-                    entry_types = []
-                    
-                    # Создаем событие с текущими параметрами
-                    ev = make_node_event(
-                        event_id=event_id,
-                        min_level=int(min_level),
-                        segment=segment,
-                        asset_bundle_path=asset_bundle,
-                        blocker_prefab_path=blocker,
-                        roundel_prefab_path=roundel,
-                        event_card_prefab_path=event_card,
-                        node_completion_prefab_path=node_completion,
-                        content_key=content_key,
-                        number_of_repeats=int(repeats),
-                        starting_event_currency=float(start_currency),
-                        is_currency_event=bool(is_currency_event),
-                        time_warning_iso=time_warning,
-                        entry_types=entry_types,
-                        segments=st.session_state.current_event_segments,
-                    )
-                    
-                    if st.session_state.editing_event_idx >= 0:
-                        # Обновляем существующее событие
-                        st.session_state.cfg["Events"][st.session_state.editing_event_idx] = ev
-                        st.success(f"✅ Событие {event_id} обновлено с {len(st.session_state.current_event_segments)} сегментом")
-                    else:
-                        # Добавляем новое событие
-                        st.session_state.cfg["Events"].append(ev)
-                        st.success(f"✅ Добавлено новое событие {event_id} с {len(st.session_state.current_event_segments)} сегментом")
-                    
-                    # Очищаем временные данные, но оставляем событие в списке
-                    st.session_state.current_event_segments = {}
-                    st.session_state.current_editing_segment = None
-                    st.session_state.current_editing_nodes = []
-                    st.session_state.editing_event_idx = -1
-                    st.session_state.temp_rewards = []
-                    st.session_state.temp_goal = None
-                    st.session_state.progress_rewards = []
-                    st.session_state.progress_goal = None
-                    
-                    # Переключаемся на вкладку 3 для просмотра структуры
-                    st.info("✅ Событие создано! Переключитесь на вкладку 'Структура и сохранение' для просмотра")
+            with col1:
+                event_id = st.text_input("EventID", value="MyEvent", key="event_id")
+                asset_bundle = st.text_input("AssetBundlePath", value="_events/MyEvent", key="asset_bundle")
+                blocker = st.text_input("BlockerPrefabPath", value="Dialogs/MyEvent_Dialog", key="blocker")
+                node_completion = st.text_input("NodeCompletionPrefabPath", value="Dialogs/MyEvent_Dialog", key="node_completion")
+                event_card = st.text_input("EventCardPrefabPath", value="", key="event_card")
             
-            with col_create_btn2:
-                if st.button("➕ СОЗДАТЬ СЕГМЕНТ ПО УМОЛЧАНИЮ", use_container_width=True):
-                    if "Default" not in st.session_state.current_event_segments:
-                        st.session_state.current_event_segments["Default"] = {
-                            "Stages": [make_stage(1, [])],
-                            "PossibleSegmentInfo": {
-                                "VIPRange": "1-10+"
-                            }
-                        }
-                        st.success("✅ Сегмент 'Default' создан")
-                        st.rerun()
-                    else:
-                        st.warning("⚠️ Сегмент 'Default' уже существует")
-               
-        with st.expander("📋 Сегменты", expanded=True):
+            with col2:
+                roundel = st.text_input("RoundelPrefabPath", value="Roundels/MyEvent_Roundel", key="roundel")
+                content_key = st.text_input("ContentKey", value="MyEvent", key="content_key")
+                min_level = st.number_input("MinLevel", min_value=1, value=1, step=1, key="min_level")
+                repeats = st.number_input("NumberOfRepeats", value=-1, step=1, key="repeats")
+                segment = st.text_input("Segment (основной сегмент)", value="Default", key="segment")
             
-            with st.form("new_segment_form"):
-                new_seg_name = st.text_input("Имя сегмента", value="VIP1_10", key="new_seg_name")
-                new_vip_range = st.text_input("VIP Range", value="1-10+", key="new_vip_range")
-                    
-                if st.form_submit_button("➕ Создать сегмент", use_container_width=True):
-                    if new_seg_name not in st.session_state.current_event_segments:
-                        # Автоматически создаем Stage 1 при создании сегмента с PossibleSegmentInfo
-                        st.session_state.current_event_segments[new_seg_name] = {
-                            "Stages": [make_stage(1, [])],
-                            "PossibleSegmentInfo": {
-                                "VIPRange": new_vip_range
-                            }
-                        }
-                        st.success(f"✅ Сегмент '{new_seg_name}' создан с VIP {new_vip_range} и Stage 1")
-                        st.rerun()
-                    else:
-                        st.error(f"❌ Сегмент '{new_seg_name}' уже существует")
-                
-            if st.session_state.current_event_segments:
-                st.divider()
-                st.write("**Удаление сегмента:**")
-                seg_to_delete = st.selectbox(
-                     "Выберите сегмент",
-                    options=[""] + list(st.session_state.current_event_segments.keys()),
-                    key="seg_delete"
+            col3, col4 = st.columns(2)
+            with col3:
+                time_warning = st.text_input("TimeWarning (ISO)", value="2026-02-21T16:00:00Z", key="time_warning")
+                start_currency = st.number_input("StartingEventCurrency", value=0.0, key="start_currency")
+            
+            with col4:
+                is_currency_event = st.checkbox("IsCurrencyEvent", value=False, key="is_currency")
+                entry_types = st.text_input("EntryTypes (через запятую)", value="", key="event_entry_types")
+            
+            # Кнопка добавления события
+            if st.button("➕ ДОБАВИТЬ СОБЫТИЕ", use_container_width=True, type="primary"):
+                # Создаем событие
+                ev = make_node_event(
+                    event_id=event_id,
+                    min_level=int(min_level),
+                    segment=segment,
+                    asset_bundle_path=asset_bundle,
+                    blocker_prefab_path=blocker,
+                    roundel_prefab_path=roundel,
+                    event_card_prefab_path=event_card,
+                    node_completion_prefab_path=node_completion,
+                    content_key=content_key,
+                    number_of_repeats=int(repeats),
+                    starting_event_currency=float(start_currency),
+                    is_currency_event=bool(is_currency_event),
+                    time_warning_iso=time_warning,
+                    entry_types=[x.strip() for x in entry_types.split(",") if x.strip()],
                 )
-                if seg_to_delete and st.button("🗑️ Удалить", use_container_width=True):
-                    del st.session_state.current_event_segments[seg_to_delete]
-                    if st.session_state.current_editing_segment == seg_to_delete:
-                        st.session_state.current_editing_segment = None
-                        st.session_state.current_editing_nodes = []
-                        st.rerun()
-            
-            
-           # with col_seg_list:
-            if st.session_state.current_event_segments:
-                st.write(f"**Текущие сегменты ({len(st.session_state.current_event_segments)}):**")
                 
-                # Получаем все entry_types из EntriesNode
-                entry_types = []
-                for segment_name, segment_data in st.session_state.current_event_segments.items():
-                    stages = segment_data.get('Stages', []) if isinstance(segment_data, dict) else []
-                    for stage in stages:
-                        if isinstance(stage, dict):
-                            for node in stage.get("Nodes", []):
-                                if isinstance(node, dict) and "EntriesNode" in node:
-                                    entry_types = node["EntriesNode"].get("EntryTypes", [])
-                                    if entry_types:
-                                        break
-                
-                if entry_types:
-                    st.info(f"🔑 Entry Types: {', '.join(entry_types)}")
-                
-                # Таблица сегментов
-                seg_data = []
-                for seg_name, seg_data_dict in st.session_state.current_event_segments.items():
-                    if isinstance(seg_data_dict, dict):
-                        stages = seg_data_dict.get('Stages', [])
-                        segment_info = seg_data_dict.get('PossibleSegmentInfo', {})
-                        vip_range = segment_info.get('VIPRange', 'N/A')
-                        total_nodes = 0
-                        for stage in stages:
-                            if isinstance(stage, dict):
-                                total_nodes += len(stage.get("Nodes", []))
-                        seg_data.append({
-                            "Сегмент": seg_name,
-                            "VIP Range": vip_range,
-                            "Нод": total_nodes
-                        })
-                
-                st.dataframe(seg_data, use_container_width=True)
-                
-                # Кнопки для редактирования нод в сегменте
-                st.write("---")
-                st.write("**Выберите сегмент для редактирования нод:**")
-                
-                for seg_name in st.session_state.current_event_segments.keys():
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"📁 {seg_name}")
-                    with col2:
-                        if st.button(f"✏️ Редактировать ноды", key=f"edit_seg_{seg_name}"):
-                            st.session_state.current_editing_segment = seg_name
-                            # Загружаем ноды из Stage 1
-                            stages = st.session_state.current_event_segments[seg_name].get('Stages', [])
-                            if stages and len(stages) > 0:
-                                st.session_state.current_editing_nodes = stages[0].get('Nodes', [])
-                            else:
-                                st.session_state.current_editing_nodes = []
-                            # Сбрасываем временные данные
-                            st.session_state.temp_rewards = []
-                            st.session_state.temp_goal = None
-                            st.session_state.progress_rewards = []
-                            st.session_state.progress_goal = None
-                            st.rerun()
-            else:
-                st.info("📭 Нет добавленных сегментов. Создайте первый сегмент ниже.")
-        
-
-        st.divider()
-        
-        # ===== РЕДАКТИРОВАНИЕ НОД В СЕГМЕНТЕ (всегда Stage 1) =====
-        if st.session_state.current_editing_segment:
-            seg_name = st.session_state.current_editing_segment
-            nodes = st.session_state.current_editing_nodes
-            
-            # Получаем информацию о сегменте для отображения
-            segment_info = st.session_state.current_event_segments[seg_name].get('PossibleSegmentInfo', {})
-            vip_range = segment_info.get('VIPRange', 'N/A')
-            
-            st.subheader(f"🔧 Редактирование нод в сегменте '{seg_name}' (VIP: {vip_range}, Stage 1)")
-            
-            if st.button("⬅️ Вернуться к списку сегментов", use_container_width=True):
-                # Сохраняем изменения перед выходом
-                if seg_name in st.session_state.current_event_segments:
-                    stages = st.session_state.current_event_segments[seg_name].get('Stages', [])
-                    if stages and len(stages) > 0:
-                        stages[0]["Nodes"] = nodes
-                    else:
-                        stages = [make_stage(1, nodes)]
-                    st.session_state.current_event_segments[seg_name]['Stages'] = stages
-                
-                st.session_state.current_editing_segment = None
-                st.session_state.current_editing_nodes = []
-                # Сбрасываем временные данные
-                st.session_state.temp_rewards = []
-                st.session_state.temp_goal = None
-                st.session_state.progress_rewards = []
-                st.session_state.progress_goal = None
+                # Добавляем в конфиг
+                st.session_state.cfg["Events"].append(ev)
+                st.session_state.current_event_idx = len(st.session_state.cfg["Events"]) - 1
+                st.session_state.creation_mode = "segment"
+                st.success(f"✅ Событие {event_id} добавлено! Теперь можно добавлять сегменты")
                 st.rerun()
+        
+        # ===== ШАГ 2: СОЗДАНИЕ СЕГМЕНТА =====
+        if st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0:
+            with st.expander("📁 ШАГ 2: Создание сегмента", expanded=st.session_state.creation_mode == "segment"):
+                st.write("Заполните параметры сегмента и нажмите кнопку 'Добавить сегмент'")
+                
+                current_event = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]
+                st.info(f"📦 Текущее событие: {current_event['EventID']}")
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    segment_name = st.text_input("Имя сегмента", value="VIP1_10", key="segment_name")
+                with col2:
+                    vip_range = st.text_input("VIP Range", value="1-10+", key="vip_range")
+                
+                # Кнопка добавления сегмента
+                if st.button("➕ ДОБАВИТЬ СЕГМЕНТ", use_container_width=True, type="primary"):
+                    if segment_name in current_event["Segments"]:
+                        st.error(f"❌ Сегмент {segment_name} уже существует!")
+                    else:
+                        # Создаем сегмент
+                        new_segment = make_segment(segment_name, vip_range)
+                        current_event["Segments"].update(new_segment)
+                        st.session_state.current_segment_name = segment_name
+                        st.session_state.current_segment_vip = vip_range
+                        st.session_state.creation_mode = "node"
+                        st.success(f"✅ Сегмент {segment_name} добавлен! Теперь можно добавлять ноды")
+                        st.rerun()
+        
+        # ===== ШАГ 3: СОЗДАНИЕ НОДЫ =====
+        if (st.session_state.cfg["Events"] and st.session_state.current_event_idx >= 0 and 
+            st.session_state.current_segment_name):
             
-            # Отображение текущих нод
-            if nodes:
-                st.write(f"**Ноды в сегменте ({len(nodes)}):**")
-                for i, node in enumerate(nodes):
-                    if not isinstance(node, dict):
-                        continue
+            current_event = st.session_state.cfg["Events"][st.session_state.current_event_idx]["PossibleNodeEventData"]
+            
+            if st.session_state.current_segment_name in current_event["Segments"]:
+                with st.expander("🔧 ШАГ 3: Создание ноды", expanded=st.session_state.creation_mode == "node"):
+                    st.write(f"Добавление ноды в сегмент: **{st.session_state.current_segment_name}**")
+                    
+                    # Вкладки для разных типов нод
+                    node_tabs = st.tabs(["📊 Progress Node", "🚪 Entries Node", "🎲 Dummy Choice Node"])
+                    
+                    # Progress Node Tab
+                    with node_tabs[0]:
+                        st.subheader("➕ Добавить Progress Node")
                         
-                    node_type = list(node.keys())[0] if node else "Unknown"
-                    node_info = node.get(node_type, {})
-                    col1, col2, col3 = st.columns([4, 1, 1])
-                    with col1:
-                        # Показываем краткую информацию о наградах и цели
-                        reward_info = ""
-                        if 'Rewards' in node_info and node_info['Rewards']:
-                            reward_count = len(node_info['Rewards'])
-                            reward_info = f" [{reward_count} наград]"
+                        # Сброс при переключении на вкладку
+                        if st.session_state.last_node_tab != "progress":
+                            st.session_state.progress_goal = get_default_goal()
+                            st.session_state.progress_rewards = [get_default_reward()]
+                            st.session_state.last_node_tab = "progress"
                         
-                        goal_info = ""
-                        if 'Goal' in node_info and node_info['Goal']:
-                            goal_types = node_info['Goal'].get('Type', [])
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="p_node_id")
+                            next_id = st.number_input("NextNodeID", min_value=1, value=2, step=1, key="p_next_id")
+                            games = st.text_input("GameList (через запятую)", value="AllGames", key="p_games")
+                            minigame = st.text_input("MiniGame", value="FlatReward", key="minigame")
+                        
+                        with col2:
+                            button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_1")
+                            button_type = st.text_input("ButtonActionType", value="", key="btn_2")
+                            button_data = st.text_input("ButtonActionData", value="", key="btn_3")
+                            is_last_node = st.checkbox("IsLastNode", value=False, key="is_last")
+                        
+                        # MinBet выбор
+                        min_bet = make_minbet_block("P", default_type="Fixed")
+                        
+                        st.write("---")
+                        st.write("**Цель:**")
+                        
+                        # Отображение текущей цели
+                        if st.session_state.progress_goal is not None:
+                            goal = st.session_state.progress_goal
+                            goal_types = goal.get('Type', [])
                             goal_type_str = ', '.join(goal_types) if goal_types else "No Type"
-                            goal_info = f" [Цель: {goal_type_str}]"
+                            st.success(f"✅ Текущая цель (по умолчанию): {goal_type_str}")
+                            
+                            st.write("**Изменить цель (если нужно):**")
+                            new_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress")
+                            if new_goal is not None:
+                                st.session_state.progress_goal = new_goal
+                                st.rerun()
                         
-                        st.write(f"{i+1}. {node_type} (ID: {node_info.get('NodeID', 'N/A')}){reward_info}{goal_info}")
-                    with col2:
-                        if st.button(f"✏️", key=f"edit_node_{seg_name}_{i}"):
-                            st.info("Редактирование ноды будет доступно в следующей версии")
-                    with col3:
-                        if st.button(f"❌", key=f"remove_node_{seg_name}_{i}"):
-                            nodes.pop(i)
-                            st.session_state.current_editing_nodes = nodes
-                            st.rerun()
-            else:
-                st.info("📭 Нет добавленных нод в этом сегменте")
-            
-            st.divider()
-            
-            # Вкладки для разных типов нод
-            node_tabs = st.tabs(["📊 Progress Node", "🚪 Entries Node", "🎲 Dummy Choice Node"])
-            
-            # Progress Node Tab
-            with node_tabs[0]:
-                st.subheader("➕ Добавить Progress Node")
-                
-                # Сброс при переключении на вкладку
-                if st.session_state.last_node_tab != "progress":
-                    # Автоматически устанавливаем default цель и награду
-                    st.session_state.progress_goal = get_default_goal()
-                    st.session_state.progress_rewards = [get_default_reward()]
-                    st.session_state.last_node_tab = "progress"
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="p_node_id")
-                    next_id = st.number_input("NextNodeID", min_value=1, value=2, step=1, key="p_next_id")
-                    games = st.text_input("GameList (через запятую)", value="AllGames", key="p_games")
-                    minigame = st.text_input("MiniGame", value="FlatReward", key="minigame")
-                
-                with col2:
-                    button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_1")
-                    button_type = st.text_input("ButtonActionType", value="", key="btn_2")
-                    button_data = st.text_input("ButtonActionData", value="", key="btn_3")
-                    is_last_node = st.checkbox("IsLastNode", value=False, key="is_last")
-                
-                # MinBet выбор
-                min_bet = make_minbet_block("P", default_type="Fixed")
-                
-                st.write("---")
-                st.write("**Цель:**")
-                
-                # Отображение текущей цели (автоматически заполнена)
-                if st.session_state.progress_goal is not None:
-                    goal = st.session_state.progress_goal
-                    goal_types = goal.get('Type', [])
-                    goal_type_str = ', '.join(goal_types) if goal_types else "No Type"
-                    
-                    # Определяем тип параметров
-                    params_type = "FixedGoal"  # По умолчанию
-                    
-                    st.success(f"✅ Текущая цель (по умолчанию): {goal_type_str} с параметрами {params_type}")
-                    
-                    # Добавляем возможность изменить цель через goal_creator_block
-                    st.write("**Изменить цель (если нужно):**")
-                    new_goal = goal_creator_block("P", goal_index=0, key_suffix=f"progress_{len(nodes)}")
-                    if new_goal is not None:
-                        st.session_state.progress_goal = new_goal
-                        st.rerun()
-                
-                st.write("---")
-                st.write("**Награды:**")
-                
-                # Отображение текущих наград (автоматически заполнены)
-                if st.session_state.progress_rewards:
-                    st.write(f"Добавлено наград: {len(st.session_state.progress_rewards)}")
-                    for j, reward in enumerate(st.session_state.progress_rewards):
-                        colr1, colr2, colr3 = st.columns([4, 1, 1])
-                        with colr1:
-                            # Краткое описание награды
-                            if 'FixedReward' in reward:
-                                desc = f"Fixed: {reward['FixedReward'].get('Amount')} {reward['FixedReward'].get('Currency')}"
-                            elif 'RtpReward' in reward:
-                                rtp = reward['RtpReward']
-                                desc = f"RTP: {rtp.get('Percentage')*100}% {rtp.get('Currency')} (min:{rtp.get('Min')} max:{rtp.get('Max')})"
-                            elif 'FreeplayUnlockReward' in reward:
-                                fp = reward['FreeplayUnlockReward']
-                                desc = f"FreePlay: {fp.get('Spins')} on {fp.get('GameName')}"
-                            elif 'CollectableSellPacksReward' in reward:
-                                pack = reward['CollectableSellPacksReward']
-                                desc = f"Packs: {pack.get('NumPacks')}x {pack.get('PackId')}"
-                            else:
-                                desc = str(reward)[:50]
-                            st.write(f"  {j+1}. {desc}")
-                        with colr2:
-                            if st.button("✏️", key=f"edit_reward_progress_{j}"):
-                                st.info("Редактирование будет доступно позже")
-                        with colr3:
-                            if st.button("❌", key=f"remove_reward_progress_{j}"):
-                                st.session_state.progress_rewards.pop(j)
-                                st.rerun()
-                else:
-                    st.info("📭 Награды не добавлены")
-                    # Если наград нет, добавляем default
-                    st.session_state.progress_rewards = [get_default_reward()]
-                    st.rerun()
-                
-                # Добавление новой награды (опционально)
-                with st.expander("➕ Добавить дополнительную награду"):
-                    new_reward = reward_creator_block("P", reward_index=f"progress_extra_{len(st.session_state.progress_rewards)}")
-                    col_button, _ = st.columns([1, 3])
-                    with col_button:
-                        if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra"):
-                            if new_reward:
-                                st.session_state.progress_rewards.append(new_reward)
-                                st.rerun()
-                
-                custom_texts = st.text_area(
-                    "CustomTexts (каждая строка - отдельный текст)", 
-                    value="SPIN\n##\nTIMES", 
-                    height=None,
-                    key="p_ct",
-                    help="Вводите каждый текст с новой строки",
-                    kwargs={"autosize": True}
-                )
-                item_collect = st.text_input("PossibleItemCollect (optional)", value="", key="p_ic")
-                
-                # Кнопка добавления ноды
-                if st.button("➕ Добавить Progress Node в сегмент", key="add_progress", use_container_width=True):
-                    if st.session_state.progress_goal is None:
-                        st.warning("⚠️ Цель не установлена, используется по умолчанию")
-                        st.session_state.progress_goal = get_default_goal()
-                    
-                    if not st.session_state.progress_rewards:
-                        st.warning("⚠️ Награды не добавлены, используется по умолчанию")
-                        st.session_state.progress_rewards = [get_default_reward()]
-                    
-                    node = make_progress_node(
-                        node_id=int(node_id),
-                        next_ids=[int(next_id)],
-                        game_list=[x.strip() for x in games.split(",") if x.strip()],
-                        min_bet=min_bet,
-                        goal=st.session_state.progress_goal,
-                        rewards=st.session_state.progress_rewards,
-                        is_last=is_last_node,
-                        resegment=False,
-                        mini_game=minigame,
-                        contribution_level="Node",
-                        button_action_type=button_type,
-                        button_action_data=button_data,
-                        button_action_text=button_text,
-                        custom_texts=process_multiline_custom_texts(custom_texts),
-                        possible_item_collect=item_collect.strip(),
-                    )
-                    nodes.append(node)
-                    st.session_state.current_editing_nodes = nodes
-                    
-                    # Сбрасываем для следующей ноды, но оставляем default значения
-                    st.session_state.progress_rewards = [get_default_reward()]
-                    st.session_state.progress_goal = get_default_goal()
-                    
-                    st.success(f"✅ Progress Node (ID: {node_id}) добавлена в сегмент")
-                    st.rerun()
-            
-            # Entries Node Tab
-            with node_tabs[1]:
-                st.subheader("➕ Добавить Entries Node")
-                
-                # Автоматические значения по умолчанию
-                default_entry_types = "MyEvent"
-                default_goal_type = "Spins"
-                default_game = "AllGames"
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="e_node_id")
-                    game_name = st.text_input("GameName", value=default_game, key="e_game")
-                
-                with col2:
-                    goal_type = st.text_input("GoalType", value=default_goal_type, key="e_goal")
-                    button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_11")
-                    button_type = st.text_input("ButtonActionType", value="", key="btn_12")
-                    button_data = st.text_input("ButtonActionData", value="", key="btn_13")
-                
-                entry_types_raw = st.text_input("EntryTypes (через запятую)", value=default_entry_types, key="e_entry_types")
-                
-                # MinBet выбор
-                min_bet = make_minbet_block("E", default_type="Fixed")
-                
-                custom_texts = st.text_area(
-                    "CustomTexts (каждая строка - отдельный текст)", 
-                    value="", 
-                    height=None,
-                    key="e_ct",
-                    help="Вводите каждый текст с новой строки",
-                    kwargs={"autosize": True}
-                )
-                item_collect = st.text_input("PossibleItemCollect", value="Default", key="e_ic")
-                
-                if st.button("➕ Добавить Entries Node в сегмент", key="add_entries", use_container_width=True):
-                    node = make_entries_node(
-                        node_id=int(node_id),
-                        game_list=[game_name],
-                        min_bet=min_bet,
-                        goal_types=[goal_type],
-                        resegment=False,
-                        button_action_type=button_type,
-                        button_action_data=button_data,
-                        button_action_text=button_text,
-                        custom_texts=process_multiline_custom_texts(custom_texts),
-                        entry_types=[x.strip() for x in entry_types_raw.split(",") if x.strip()],
-                        possible_item_collect=item_collect.strip() or "Default",
-                    )
-                    
-                    nodes.append(node)
-                    st.session_state.current_editing_nodes = nodes
-                    st.success(f"✅ Entries Node (ID: {node_id}) добавлена в сегмент")
-                    st.rerun()
-            
-            # Dummy Choice Tab
-            with node_tabs[2]:
-                st.subheader("➕ Добавить Dummy Choice Node")
-                
-                # Сброс временных наград при переключении на вкладку
-                if st.session_state.last_node_tab != "dummy":
-                    st.session_state.last_node_tab = "dummy"
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="d_node_id")
-                    next_ids_raw = st.text_input("NextNodeID (через запятую)", value="11,21,31", key="d_next")
-                
-                with col2:
-                    button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="d_btn")
-                    is_choice = st.checkbox("IsChoiceEvent", value=True, key="d_choice")
-                
-                st.write("---")
-                st.write("**Награды:**")
-                
-                # Отображение текущих наград
-                if st.session_state.temp_rewards:
-                    st.write(f"Добавлено наград: {len(st.session_state.temp_rewards)}")
-                    for j, reward in enumerate(st.session_state.temp_rewards):
-                        colr1, colr2 = st.columns([5, 1])
-                        with colr1:
-                            # Всегда FixedReward с Amount=0 и Currency=Chips
-                            desc = f"Fixed: 0 Chips"
-                            st.write(f"  {j+1}. {desc}")
-                        with colr2:
-                            if st.button("❌", key=f"remove_reward_d_{j}_{len(nodes)}_{j}"):
-                                st.session_state.temp_rewards.pop(j)
-                                st.rerun()
-                else:
-                    st.info("📭 Награды не добавлены")
-                
-                # Добавление новой награды (теперь всегда фиксированная)
-                with st.expander("➕ Добавить награду"):
-                    st.write("**Фиксированная награда:** 0 Chips")
-                    
-                    col_button, _ = st.columns([1, 3])
-                    with col_button:
-                        if st.button("➕ Добавить эту награду в список", key=f"add_reward_d_{len(st.session_state.temp_rewards)}_{len(nodes)}"):
-                            # Создаем фиксированную награду
-                            fixed_reward = {
-                                "FixedReward": {
-                                    "Currency": "Chips",
-                                    "Amount": 0
-                                }
-                            }
-                            st.session_state.temp_rewards.append(fixed_reward)
-                            st.rerun()
-                
-                custom_texts = st.text_area(
-                    "CustomTexts (каждая строка - отдельный текст)", 
-                    value="", 
-                    height=None,
-                    key="d_ct",
-                    help="Вводите каждый текст с новой строки",
-                    kwargs={"autosize": True}
-                )
-                
-                if st.button("➕ Добавить Dummy Choice Node в сегмент", key="add_dummy", use_container_width=True):
-                    if not st.session_state.temp_rewards:
-                        st.warning("⚠️ Добавьте хотя бы одну награду")
-                    else:
-                        next_ids = []
-                        for x in next_ids_raw.split(","):
-                            x = x.strip()
-                            if x:
-                                try:
-                                    next_ids.append(int(x))
-                                except:
-                                    pass
+                        st.write("---")
+                        st.write("**Награды:**")
                         
-                        node = make_dummy_choice_node(
-                            node_id=int(node_id),
-                            next_ids=next_ids if next_ids else [11, 21, 31],
-                            rewards=st.session_state.temp_rewards.copy(),
-                            is_last=False,
-                            resegment=False,
-                            mini_game="FlatReward",
-                            contribution_level="Node",
-                            button_action_type="",
-                            button_action_data="",
-                            button_action_text=button_text,
-                            custom_texts=process_multiline_custom_texts(custom_texts),
-                            is_choice_event=bool(is_choice),
+                        # Отображение текущих наград
+                        if st.session_state.progress_rewards:
+                            st.write(f"Добавлено наград: {len(st.session_state.progress_rewards)}")
+                            for j, reward in enumerate(st.session_state.progress_rewards):
+                                colr1, colr2, colr3 = st.columns([4, 1, 1])
+                                with colr1:
+                                    if 'FixedReward' in reward:
+                                        desc = f"Fixed: {reward['FixedReward'].get('Amount')} {reward['FixedReward'].get('Currency')}"
+                                    elif 'RtpReward' in reward:
+                                        rtp = reward['RtpReward']
+                                        desc = f"RTP: {rtp.get('Percentage')*100}% {rtp.get('Currency')}"
+                                    elif 'FreeplayUnlockReward' in reward:
+                                        fp = reward['FreeplayUnlockReward']
+                                        desc = f"FreePlay: {fp.get('Spins')} on {fp.get('GameName')}"
+                                    elif 'CollectableSellPacksReward' in reward:
+                                        pack = reward['CollectableSellPacksReward']
+                                        desc = f"Packs: {pack.get('NumPacks')}x {pack.get('PackId')}"
+                                    else:
+                                        desc = str(reward)[:50]
+                                    st.write(f"  {j+1}. {desc}")
+                                with colr2:
+                                    if st.button("✏️", key=f"edit_reward_progress_{j}"):
+                                        st.info("Редактирование будет доступно позже")
+                                with colr3:
+                                    if st.button("❌", key=f"remove_reward_progress_{j}"):
+                                        st.session_state.progress_rewards.pop(j)
+                                        st.rerun()
+                        else:
+                            st.info("📭 Награды не добавлены")
+                            st.session_state.progress_rewards = [get_default_reward()]
+                            st.rerun()
+                        
+                        # Добавление новой награды
+                        with st.expander("➕ Добавить дополнительную награду"):
+                            new_reward = reward_creator_block("P", reward_index=f"progress_extra")
+                            col_button, _ = st.columns([1, 3])
+                            with col_button:
+                                if st.button("➕ Добавить эту награду в список", key="add_reward_progress_extra"):
+                                    if new_reward:
+                                        st.session_state.progress_rewards.append(new_reward)
+                                        st.rerun()
+                        
+                        custom_texts = st.text_area(
+                            "CustomTexts (каждая строка - отдельный текст)", 
+                            value="SPIN\n##\nTIMES", 
+                            height=None,
+                            key="p_ct",
+                            help="Вводите каждый текст с новой строки"
                         )
-                        nodes.append(node)
-                        st.session_state.current_editing_nodes = nodes
-                        st.success(f"✅ Dummy Node (ID: {node_id}) добавлена в сегмент")
-                        st.rerun()
-        
-        st.divider()
-        
-        # Кнопки сохранения события
-        col_save1, col_save2, col_save3 = st.columns(3)
-        
-        with col_save1:
-            if st.button("💾 Сохранить событие", use_container_width=True, type="primary"):
-                if not st.session_state.current_event_segments:
-                    st.error("❌ Нельзя сохранить событие без сегментов!")
-                else:
-                    # Сохраняем текущие изменения, если редактируем сегмент
-                    if st.session_state.current_editing_segment:
-                        seg_name = st.session_state.current_editing_segment
-                        if seg_name in st.session_state.current_event_segments:
-                            stages = st.session_state.current_event_segments[seg_name].get('Stages', [])
-                            if stages and len(stages) > 0:
-                                stages[0]["Nodes"] = st.session_state.current_editing_nodes
+                        item_collect = st.text_input("PossibleItemCollect (optional)", value="", key="p_ic")
+                        
+                        # Кнопка добавления ноды
+                        if st.button("➕ ДОБАВИТЬ PROGRESS NODE", key="add_progress", use_container_width=True, type="primary"):
+                            if st.session_state.progress_goal is None:
+                                st.warning("⚠️ Цель не установлена, используется по умолчанию")
+                                st.session_state.progress_goal = get_default_goal()
+                            
+                            if not st.session_state.progress_rewards:
+                                st.warning("⚠️ Награды не добавлены, используется по умолчанию")
+                                st.session_state.progress_rewards = [get_default_reward()]
+                            
+                            node = make_progress_node(
+                                node_id=int(node_id),
+                                next_ids=[int(next_id)],
+                                game_list=[x.strip() for x in games.split(",") if x.strip()],
+                                min_bet=min_bet,
+                                goal=st.session_state.progress_goal,
+                                rewards=st.session_state.progress_rewards,
+                                is_last=is_last_node,
+                                resegment=False,
+                                mini_game=minigame,
+                                contribution_level="Node",
+                                button_action_type=button_type,
+                                button_action_data=button_data,
+                                button_action_text=button_text,
+                                custom_texts=process_multiline_custom_texts(custom_texts),
+                                possible_item_collect=item_collect.strip(),
+                            )
+                            
+                            # Добавляем ноду в сегмент
+                            segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                            if segment_data["Stages"]:
+                                segment_data["Stages"][0]["Nodes"].append(node)
                             else:
-                                stages = [make_stage(1, st.session_state.current_editing_nodes)]
-                            st.session_state.current_event_segments[seg_name]['Stages'] = stages
+                                segment_data["Stages"] = [make_stage(1, [node])]
+                            
+                            # Сбрасываем для следующей ноды
+                            st.session_state.progress_rewards = [get_default_reward()]
+                            st.session_state.progress_goal = get_default_goal()
+                            
+                            st.success(f"✅ Progress Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                            st.rerun()
                     
-                    # Собираем все entry_types из всех EntriesNode
-                    entry_types = []
-                    for segment_name, segment_data in st.session_state.current_event_segments.items():
-                        stages = segment_data.get('Stages', []) if isinstance(segment_data, dict) else []
-                        for stage in stages:
-                            if isinstance(stage, dict):
-                                for node in stage.get("Nodes", []):
-                                    if isinstance(node, dict) and "EntriesNode" in node:
-                                        entry_types = node["EntriesNode"].get("EntryTypes", [])
-                                        if entry_types:
-                                            break
+                    # Entries Node Tab
+                    with node_tabs[1]:
+                        st.subheader("➕ Добавить Entries Node")
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="e_node_id")
+                            game_name = st.text_input("GameName", value="AllGames", key="e_game")
+                        
+                        with col2:
+                            goal_type = st.text_input("GoalType", value="Spins", key="e_goal")
+                            button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="btn_11")
+                            button_type = st.text_input("ButtonActionType", value="", key="btn_12")
+                            button_data = st.text_input("ButtonActionData", value="", key="btn_13")
+                        
+                        entry_types_raw = st.text_input("EntryTypes (через запятую)", value="MyEvent", key="e_entry_types")
+                        
+                        min_bet = make_minbet_block("E", default_type="Fixed")
+                        
+                        custom_texts = st.text_area(
+                            "CustomTexts (каждая строка - отдельный текст)", 
+                            value="", 
+                            height=None,
+                            key="e_ct",
+                            help="Вводите каждый текст с новой строки"
+                        )
+                        item_collect = st.text_input("PossibleItemCollect", value="Default", key="e_ic")
+                        
+                        if st.button("➕ ДОБАВИТЬ ENTRIES NODE", key="add_entries", use_container_width=True, type="primary"):
+                            node = make_entries_node(
+                                node_id=int(node_id),
+                                game_list=[game_name],
+                                min_bet=min_bet,
+                                goal_types=[goal_type],
+                                resegment=False,
+                                button_action_type=button_type,
+                                button_action_data=button_data,
+                                button_action_text=button_text,
+                                custom_texts=process_multiline_custom_texts(custom_texts),
+                                entry_types=[x.strip() for x in entry_types_raw.split(",") if x.strip()],
+                                possible_item_collect=item_collect.strip() or "Default",
+                            )
+                            
+                            # Добавляем ноду в сегмент
+                            segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                            if segment_data["Stages"]:
+                                segment_data["Stages"][0]["Nodes"].append(node)
+                            else:
+                                segment_data["Stages"] = [make_stage(1, [node])]
+                            
+                            st.success(f"✅ Entries Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                            st.rerun()
                     
-                    # Создаем событие с множественными сегментами
-                    ev = make_node_event(
-                        event_id=event_id,
-                        min_level=int(min_level),
-                        segment=segment,
-                        asset_bundle_path=asset_bundle,
-                        blocker_prefab_path=blocker,
-                        roundel_prefab_path=roundel,
-                        event_card_prefab_path=event_card,
-                        node_completion_prefab_path=node_completion,
-                        content_key=content_key,
-                        number_of_repeats=int(repeats),
-                        starting_event_currency=float(start_currency),
-                        is_currency_event=bool(is_currency_event),
-                        time_warning_iso=time_warning,
-                        entry_types=entry_types,
-                        segments=st.session_state.current_event_segments,
-                    )
-                    
-                    if st.session_state.editing_event_idx >= 0:
-                        # Обновляем существующее событие
-                        st.session_state.cfg["Events"][st.session_state.editing_event_idx] = ev
-                        st.success(f"✅ Событие {event_id} обновлено с {len(st.session_state.current_event_segments)} сегментами")
-                    else:
-                        # Добавляем новое событие
-                        st.session_state.cfg["Events"].append(ev)
-                        st.success(f"✅ Добавлено новое событие {event_id} с {len(st.session_state.current_event_segments)} сегментами")
-                    
-                    # Очищаем текущие сегменты
-                    st.session_state.current_event_segments = {}
-                    st.session_state.current_editing_segment = None
-                    st.session_state.current_editing_nodes = []
-                    st.session_state.editing_event_idx = -1
-                    st.session_state.temp_rewards = []
-                    st.session_state.temp_goal = None
-                    st.session_state.progress_rewards = []
-                    st.session_state.progress_goal = None
+                    # Dummy Choice Tab
+                    with node_tabs[2]:
+                        st.subheader("➕ Добавить Dummy Choice Node")
+                        
+                        if st.session_state.last_node_tab != "dummy":
+                            st.session_state.last_node_tab = "dummy"
+                            st.session_state.temp_rewards = []
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            node_id = st.number_input("NodeID", min_value=1, value=1, step=1, key="d_node_id")
+                            next_ids_raw = st.text_input("NextNodeID (через запятую)", value="11,21,31", key="d_next")
+                        
+                        with col2:
+                            button_text = st.text_input("ButtonActionText", value="PLAY NOW!", key="d_btn")
+                            is_choice = st.checkbox("IsChoiceEvent", value=True, key="d_choice")
+                        
+                        st.write("---")
+                        st.write("**Награды:**")
+                        
+                        if st.session_state.temp_rewards:
+                            st.write(f"Добавлено наград: {len(st.session_state.temp_rewards)}")
+                            for j, reward in enumerate(st.session_state.temp_rewards):
+                                colr1, colr2 = st.columns([5, 1])
+                                with colr1:
+                                    desc = f"Fixed: 0 Chips"
+                                    st.write(f"  {j+1}. {desc}")
+                                with colr2:
+                                    if st.button("❌", key=f"remove_reward_d_{j}"):
+                                        st.session_state.temp_rewards.pop(j)
+                                        st.rerun()
+                        else:
+                            st.info("📭 Награды не добавлены")
+                        
+                        with st.expander("➕ Добавить награду"):
+                            st.write("**Фиксированная награда:** 0 Chips")
+                            col_button, _ = st.columns([1, 3])
+                            with col_button:
+                                if st.button("➕ Добавить эту награду в список", key="add_reward_d"):
+                                    fixed_reward = {"FixedReward": {"Currency": "Chips", "Amount": 0}}
+                                    st.session_state.temp_rewards.append(fixed_reward)
+                                    st.rerun()
+                        
+                        custom_texts = st.text_area(
+                            "CustomTexts (каждая строка - отдельный текст)", 
+                            value="", 
+                            height=None,
+                            key="d_ct",
+                            help="Вводите каждый текст с новой строки"
+                        )
+                        
+                        if st.button("➕ ДОБАВИТЬ DUMMY NODE", key="add_dummy", use_container_width=True, type="primary"):
+                            if not st.session_state.temp_rewards:
+                                st.warning("⚠️ Добавьте хотя бы одну награду")
+                            else:
+                                next_ids = []
+                                for x in next_ids_raw.split(","):
+                                    x = x.strip()
+                                    if x:
+                                        try:
+                                            next_ids.append(int(x))
+                                        except:
+                                            pass
+                                
+                                node = make_dummy_choice_node(
+                                    node_id=int(node_id),
+                                    next_ids=next_ids if next_ids else [11, 21, 31],
+                                    rewards=st.session_state.temp_rewards.copy(),
+                                    is_last=False,
+                                    resegment=False,
+                                    mini_game="FlatReward",
+                                    contribution_level="Node",
+                                    button_action_type="",
+                                    button_action_data="",
+                                    button_action_text=button_text,
+                                    custom_texts=process_multiline_custom_texts(custom_texts),
+                                    is_choice_event=bool(is_choice),
+                                )
+                                
+                                # Добавляем ноду в сегмент
+                                segment_data = current_event["Segments"][st.session_state.current_segment_name]
+                                if segment_data["Stages"]:
+                                    segment_data["Stages"][0]["Nodes"].append(node)
+                                else:
+                                    segment_data["Stages"] = [make_stage(1, [node])]
+                                
+                                st.session_state.temp_rewards = []
+                                st.success(f"✅ Dummy Node (ID: {node_id}) добавлена в сегмент {st.session_state.current_segment_name}")
+                                st.rerun()
         
-        with col_save2:
-            if st.button("🔄 Очистить все", use_container_width=True):
-                st.session_state.current_event_segments = {}
-                st.session_state.current_editing_segment = None
-                st.session_state.current_editing_nodes = []
+        # Кнопки управления
+        st.divider()
+        col_reset1, col_reset2, col_reset3 = st.columns(3)
+        
+        with col_reset1:
+            if st.button("🔄 Начать новое событие", use_container_width=True):
+                st.session_state.current_event_idx = -1
+                st.session_state.current_segment_name = ""
+                st.session_state.creation_mode = "event"
                 st.session_state.temp_rewards = []
                 st.session_state.temp_goal = None
                 st.session_state.progress_rewards = []
                 st.session_state.progress_goal = None
                 st.rerun()
         
-        with col_save3:
-            if st.session_state.cfg.get("Events") and st.button("📝 Редактировать существующее событие", use_container_width=True):
-                st.info("Перейдите на вкладку 'Структура', выберите событие и нажмите 'Редактировать'")
+        with col_reset2:
+            if st.button("➕ Добавить еще сегмент", use_container_width=True):
+                if st.session_state.current_event_idx >= 0:
+                    st.session_state.creation_mode = "segment"
+                    st.rerun()
 
     with colwww2:
         # Отображение всех событий
