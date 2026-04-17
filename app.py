@@ -1,6 +1,7 @@
 import json
 from copy import deepcopy
 import streamlit as st
+from datetime import datetime, timedelta
 
 try:
     import jsonschema
@@ -122,7 +123,7 @@ def make_progress_node(node_id: int, next_ids: list[int], game_list: list[str], 
                        resegment: bool, mini_game: str, contribution_level: str,
                        button_action_type: str, button_action_data: str, button_action_text: str,
                        custom_texts: list[str], possible_item_collect: str = "",
-                       hide_loading_screen: bool = False, prize_box_index: int = -1) -> dict:  # --- НОВОЕ: параметры
+                       hide_loading_screen: bool = False, prize_box_index: int = -1) -> dict:
     node = {
         "ProgressNode": {
             "NodeID": node_id,
@@ -139,12 +140,12 @@ def make_progress_node(node_id: int, next_ids: list[int], game_list: list[str], 
             "ButtonActionData": button_action_data,
             "ButtonActionText": button_action_text,
             "CustomTexts": custom_texts,
-            "HideLoadingScreenForReward": hide_loading_screen,  # --- НОВОЕ
+            "HideLoadingScreenForReward": hide_loading_screen,
         }
     }
     if possible_item_collect:
         node["ProgressNode"]["PossibleItemCollect"] = possible_item_collect
-    if prize_box_index > 0:  # --- НОВОЕ: добавляем только если >0
+    if prize_box_index > 0:
         node["ProgressNode"]["PrizeBoxIndex"] = prize_box_index
     return node
 
@@ -154,7 +155,7 @@ def make_entries_node(node_id: int, game_list: list[str], min_bet: dict,
                       button_action_type: str, button_action_data: str, button_action_text: str,
                       custom_texts: list[str], entry_types: list[str],
                       possible_item_collect: str = "Default",
-                      prize_box_index: int = -1) -> dict:  # --- НОВОЕ: параметр
+                      prize_box_index: int = -1) -> dict:
     node = {
         "EntriesNode": {
             "NodeID": node_id,
@@ -170,7 +171,7 @@ def make_entries_node(node_id: int, game_list: list[str], min_bet: dict,
             "EntryTypes": entry_types,
         }
     }
-    if prize_box_index > 0:  # --- НОВОЕ
+    if prize_box_index > 0:
         node["EntriesNode"]["PrizeBoxIndex"] = prize_box_index
     return node
 
@@ -180,7 +181,7 @@ def make_dummy_choice_node(node_id: int, next_ids: list[int], rewards: list[dict
                            button_action_type: str, button_action_data: str, button_action_text: str,
                            custom_texts: list[str], is_choice_event: bool = True,
                            default_node_id: int = None, hide_loading_screen: bool = False,
-                           prize_box_index: int = -1) -> dict:  # --- НОВОЕ: параметры
+                           prize_box_index: int = -1) -> dict:
     if default_node_id is None:
         default_node_id = next_ids[0] if next_ids else 1
 
@@ -188,7 +189,7 @@ def make_dummy_choice_node(node_id: int, next_ids: list[int], rewards: list[dict
         "DummyNode": {
             "NodeID": node_id,
             "NextNodeID": next_ids,
-            "DefaultNodeID": default_node_id,  # --- НОВОЕ: обязательное поле
+            "DefaultNodeID": default_node_id,
             "Rewards": rewards,
             "IsLastNode": is_last,
             "ResegmentFlag": resegment,
@@ -199,25 +200,31 @@ def make_dummy_choice_node(node_id: int, next_ids: list[int], rewards: list[dict
             "ButtonActionText": button_action_text,
             "CustomTexts": custom_texts,
             "IsChoiceEvent": is_choice_event,
-            "HideLoadingScreenForReward": hide_loading_screen,  # --- НОВОЕ
+            "HideLoadingScreenForReward": hide_loading_screen,
         }
     }
-    if prize_box_index > 0:  # --- НОВОЕ
+    if prize_box_index > 0:
         node["DummyNode"]["PrizeBoxIndex"] = prize_box_index
     return node
+
+
+def get_default_time_warning():
+    """Возвращает текущую дату + 1 месяц в формате ISO 8601 (UTC)"""
+    future = datetime.utcnow() + timedelta(days=30)
+    return future.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def make_node_event(event_id: str, min_level: int, segment: str,
                     asset_bundle_path: str, blocker_prefab_path: str, roundel_prefab_path: str,
                     event_card_prefab_path: str, node_completion_prefab_path: str,
                     content_key: str, number_of_repeats: int,
-                    starting_event_currency: float, is_currency_event: bool,
-                    time_warning_iso: str, entry_types: list[str],
+                    entry_types: list[str],
                     segments: dict = None,
-                    is_roundel_hidden: bool = False,                # --- НОВОЕ
-                    use_node_failed_notification: bool = False,      # --- НОВОЕ
-                    is_prize_pursuit: bool = False,                  # --- НОВОЕ
-                    use_force_landscape_on_web: bool = False) -> dict:  # --- НОВОЕ
+                    is_roundel_hidden: bool = False,
+                    use_node_failed_notification: bool = False,
+                    is_prize_pursuit: bool = False,
+                    use_force_landscape_on_web: bool = False,
+                    show_roundel_on_all_machines: bool = False) -> dict:
     if segments is None:
         segments = {}
     formatted_segments = {}
@@ -258,15 +265,16 @@ def make_node_event(event_id: str, min_level: int, segment: str,
             "NodeCompletionPrefabPath": node_completion_prefab_path,
             "ContentKey": content_key,
             "NumberOfRepeats": number_of_repeats,
-            "StartingEventCurrency": starting_event_currency,
-            "IsCurrencyEvent": is_currency_event,
-            "TimeWarning": time_warning_iso,
+            "StartingEventCurrency": 0.0,                # скрыто, всегда 0
+            "IsCurrencyEvent": False,                   # скрыто, всегда False
+            "TimeWarning": get_default_time_warning(),  # скрыто, автоматически сегодня+месяц
             "EntryTypes": entry_types,
             "Segments": formatted_segments,
-            "IsRoundelHidden": is_roundel_hidden,                # --- НОВОЕ
-            "UseNodeFailedNotification": use_node_failed_notification,  # --- НОВОЕ
-            "IsPrizePursuit": is_prize_pursuit,                  # --- НОВОЕ
-            "UseForceLandscapeOnWeb": use_force_landscape_on_web,  # --- НОВОЕ
+            "IsRoundelHidden": is_roundel_hidden,
+            "UseNodeFailedNotification": use_node_failed_notification,
+            "IsPrizePursuit": is_prize_pursuit,
+            "UseForceLandscapeOnWeb": use_force_landscape_on_web,
+            "ShowRoundelOnAllMachines": show_roundel_on_all_machines,
         }
     }
 
@@ -310,15 +318,12 @@ def display_event_structure(event, event_idx=None):
             st.session_state.edit_min_level = event_data['MinLevel']
             st.session_state.edit_repeats = event_data['NumberOfRepeats']
             st.session_state.edit_segment = event_data['Segment']
-            st.session_state.edit_time_warning = event_data['TimeWarning']
-            st.session_state.edit_start_currency = event_data['StartingEventCurrency']
-            st.session_state.edit_is_currency = event_data['IsCurrencyEvent']
             st.session_state.edit_entry_types = ', '.join(event_data.get('EntryTypes', []))
-            # --- НОВОЕ: загрузка новых полей
             st.session_state.edit_is_roundel_hidden = event_data.get('IsRoundelHidden', False)
             st.session_state.edit_use_node_failed_notification = event_data.get('UseNodeFailedNotification', False)
             st.session_state.edit_is_prize_pursuit = event_data.get('IsPrizePursuit', False)
             st.session_state.edit_use_force_landscape_on_web = event_data.get('UseForceLandscapeOnWeb', False)
+            st.session_state.edit_show_roundel_on_all_machines = event_data.get('ShowRoundelOnAllMachines', False)
 
             st.success(f"✅ Событие загружено для редактирования. Перейдите на вкладку 'Настройка события'")
             st.rerun()
@@ -455,8 +460,8 @@ def display_event_structure(event, event_idx=None):
                                 st.session_state.edit_p_is_last = node_info.get('IsLastNode', False)
                                 st.session_state.edit_p_custom_texts = '\n'.join(node_info.get('CustomTexts', []))
                                 st.session_state.edit_p_item_collect = node_info.get('PossibleItemCollect', '')
-                                st.session_state.edit_p_hide_loading = node_info.get('HideLoadingScreenForReward', False)  # --- НОВОЕ
-                                st.session_state.edit_p_prize_box = node_info.get('PrizeBoxIndex', -1)  # --- НОВОЕ
+                                st.session_state.edit_p_hide_loading = node_info.get('HideLoadingScreenForReward', False)
+                                st.session_state.edit_p_prize_box = node_info.get('PrizeBoxIndex', -1)
 
                                 min_bet = node_info.get('MinBet', {})
                                 if 'FixedMinBet' in min_bet:
@@ -482,7 +487,7 @@ def display_event_structure(event, event_idx=None):
                                 st.session_state.edit_e_entry_types = ', '.join(node_info.get('EntryTypes', ['MyEvent']))
                                 st.session_state.edit_e_custom_texts = '\n'.join(node_info.get('CustomTexts', []))
                                 st.session_state.edit_e_item_collect = node_info.get('PossibleItemCollect', 'Default')
-                                st.session_state.edit_e_prize_box = node_info.get('PrizeBoxIndex', -1)  # --- НОВОЕ
+                                st.session_state.edit_e_prize_box = node_info.get('PrizeBoxIndex', -1)
 
                                 min_bet = node_info.get('MinBet', {})
                                 if 'FixedMinBet' in min_bet:
@@ -502,9 +507,9 @@ def display_event_structure(event, event_idx=None):
                                 st.session_state.edit_d_button_text = node_info.get('ButtonActionText', 'PLAY NOW!')
                                 st.session_state.edit_d_is_choice = node_info.get('IsChoiceEvent', True)
                                 st.session_state.edit_d_custom_texts = '\n'.join(node_info.get('CustomTexts', []))
-                                st.session_state.edit_d_default_node_id = node_info.get('DefaultNodeID', 1)  # --- НОВОЕ
-                                st.session_state.edit_d_hide_loading = node_info.get('HideLoadingScreenForReward', False)  # --- НОВОЕ
-                                st.session_state.edit_d_prize_box = node_info.get('PrizeBoxIndex', -1)  # --- НОВОЕ
+                                st.session_state.edit_d_default_node_id = node_info.get('DefaultNodeID', 1)
+                                st.session_state.edit_d_hide_loading = node_info.get('HideLoadingScreenForReward', False)
+                                st.session_state.edit_d_prize_box = node_info.get('PrizeBoxIndex', -1)
                                 st.session_state.temp_rewards = node_info.get('Rewards', [])
 
                             st.success(f"✅ Нода {node_info.get('NodeID', 'N/A')} загружена для редактирования")
@@ -763,7 +768,7 @@ if "last_node_type" not in st.session_state:
 if "selected_node_type" not in st.session_state:
     st.session_state.selected_node_type = "ProgressNode"
 
-# --- НОВОЕ: инициализация новых переменных для события
+# Новые переменные для события
 if "edit_is_roundel_hidden" not in st.session_state:
     st.session_state.edit_is_roundel_hidden = False
 if "edit_use_node_failed_notification" not in st.session_state:
@@ -772,6 +777,8 @@ if "edit_is_prize_pursuit" not in st.session_state:
     st.session_state.edit_is_prize_pursuit = False
 if "edit_use_force_landscape_on_web" not in st.session_state:
     st.session_state.edit_use_force_landscape_on_web = False
+if "edit_show_roundel_on_all_machines" not in st.session_state:
+    st.session_state.edit_show_roundel_on_all_machines = False
 
 # Создаем 3 главные вкладки
 tab1, tab2, tab3 = st.tabs([
@@ -895,30 +902,31 @@ with tab2:
                 default_segment = st.session_state.get('edit_segment', 'Default')
                 segment = st.text_input("Segment (основной сегмент)", value=default_segment, key="segment")
 
-            col3, col4 = st.columns(2)
-            with col3:
-                default_time_warning = st.session_state.get('edit_time_warning', '2026-02-21T16:00:00Z')
-                time_warning = st.text_input("TimeWarning (ISO)", value=default_time_warning, key="time_warning")
-                default_start_currency = st.session_state.get('edit_start_currency', 0.0)
-                start_currency = st.number_input("StartingEventCurrency", value=float(default_start_currency), key="start_currency")
-            with col4:
-                default_is_currency = st.session_state.get('edit_is_currency', False)
-                is_currency_event = st.checkbox("IsCurrencyEvent", value=bool(default_is_currency), key="is_currency")
-                default_entry_types = st.session_state.get('edit_entry_types', '')
-                entry_types = st.text_input("EntryTypes (через запятую)", value=default_entry_types, key="event_entry_types")
+            # EntryTypes
+            default_entry_types = st.session_state.get('edit_entry_types', '')
+            entry_types = st.text_input("EntryTypes (через запятую)", value=default_entry_types, key="event_entry_types")
 
-            # --- НОВОЕ: чекбоксы для дополнительных полей события
+            # --- ГРУППИРОВКА ЧЕКБОКСОВ (ИЗМЕНЕНИЯ) ---
             col5, col6 = st.columns(2)
             with col5:
                 default_is_roundel_hidden = st.session_state.get('edit_is_roundel_hidden', False)
                 is_roundel_hidden = st.checkbox("IsRoundelHidden", value=bool(default_is_roundel_hidden), key="is_roundel_hidden")
-                default_use_node_failed = st.session_state.get('edit_use_node_failed_notification', False)
-                use_node_failed = st.checkbox("UseNodeFailedNotification", value=bool(default_use_node_failed), key="use_node_failed")
             with col6:
-                default_is_prize_pursuit = st.session_state.get('edit_is_prize_pursuit', False)
-                is_prize_pursuit = st.checkbox("IsPrizePursuit", value=bool(default_is_prize_pursuit), key="is_prize_pursuit")
-                default_use_force_landscape = st.session_state.get('edit_use_force_landscape_on_web', False)
-                use_force_landscape = st.checkbox("UseForceLandscapeOnWeb", value=bool(default_use_force_landscape), key="use_force_landscape")
+                default_show_roundel_all = st.session_state.get('edit_show_roundel_on_all_machines', False)
+                show_roundel_all = st.checkbox("ShowRoundelOnAllMachines", value=bool(default_show_roundel_all), key="show_roundel_all")
+
+            with st.expander("💵 CashOutEvent Settings", expanded=True):
+                col_cash1, col_cash2, col_cash3 = st.columns(3)
+                with col_cash1:
+                    default_use_node_failed = st.session_state.get('edit_use_node_failed_notification', False)
+                    use_node_failed = st.checkbox("UseNodeFailedNotification", value=bool(default_use_node_failed), key="use_node_failed")
+                with col_cash2:
+                    default_is_prize_pursuit = st.session_state.get('edit_is_prize_pursuit', False)
+                    is_prize_pursuit = st.checkbox("IsPrizePursuit", value=bool(default_is_prize_pursuit), key="is_prize_pursuit")
+                with col_cash3:
+                    default_use_force_landscape = st.session_state.get('edit_use_force_landscape_on_web', False)
+                    use_force_landscape = st.checkbox("UseForceLandscapeOnWeb", value=bool(default_use_force_landscape), key="use_force_landscape")
+            # --- КОНЕЦ ИЗМЕНЕНИЙ ---
 
             if st.session_state.is_editing:
                 button_text = "💾 СОХРАНИТЬ ИЗМЕНЕНИЯ"
@@ -939,16 +947,19 @@ with tab2:
                     node_completion_prefab_path=node_completion,
                     content_key=content_key,
                     number_of_repeats=int(repeats),
-                    starting_event_currency=float(start_currency),
-                    is_currency_event=bool(is_currency_event),
-                    time_warning_iso=time_warning,
                     entry_types=[x.strip() for x in entry_types.split(",") if x.strip()],
                     is_roundel_hidden=is_roundel_hidden,
                     use_node_failed_notification=use_node_failed,
                     is_prize_pursuit=is_prize_pursuit,
                     use_force_landscape_on_web=use_force_landscape,
+                    show_roundel_on_all_machines=show_roundel_all,
                 )
                 if st.session_state.is_editing:
+                    # При редактировании сохраняем существующие значения TimeWarning, Currency, IsCurrency
+                    old_event = st.session_state.cfg["Events"][st.session_state.editing_event_idx]["PossibleNodeEventData"]
+                    ev["PossibleNodeEventData"]["StartingEventCurrency"] = old_event.get("StartingEventCurrency", 0.0)
+                    ev["PossibleNodeEventData"]["IsCurrencyEvent"] = old_event.get("IsCurrencyEvent", False)
+                    ev["PossibleNodeEventData"]["TimeWarning"] = old_event.get("TimeWarning", get_default_time_warning())
                     st.session_state.cfg["Events"][st.session_state.editing_event_idx] = ev
                     st.session_state.is_editing = False
                     st.session_state.editing_event_data = None
@@ -1191,7 +1202,6 @@ with tab2:
                         default_p_item_collect = st.session_state.get('edit_p_item_collect', 'Default')
                         item_collect = st.text_input("PossibleItemCollect", value=default_p_item_collect, key="p_ic_edit" if st.session_state.is_editing_node else "p_ic")
 
-                        # --- НОВОЕ: поля HideLoadingScreenForReward и PrizeBoxIndex
                         col_hl, col_pb = st.columns(2)
                         with col_hl:
                             default_p_hide_loading = st.session_state.get('edit_p_hide_loading', False)
@@ -1298,7 +1308,6 @@ with tab2:
                         default_e_item_collect = st.session_state.get('edit_e_item_collect', 'Default')
                         item_collect = st.text_input("PossibleItemCollect", value=default_e_item_collect, key="e_ic_edit" if st.session_state.is_editing_node else "e_ic")
 
-                        # --- НОВОЕ: PrizeBoxIndex
                         default_e_prize_box = st.session_state.get('edit_e_prize_box', -1)
                         prize_box = st.number_input("PrizeBoxIndex (0 = не задано)", value=int(default_e_prize_box), step=1, key="e_prize_box_edit" if st.session_state.is_editing_node else "e_prize_box")
 
@@ -1353,7 +1362,6 @@ with tab2:
                         default_d_custom_texts = st.session_state.get('edit_d_custom_texts', '')
                         custom_texts = st.text_area("CustomTexts (каждая строка - отдельный текст)", value=default_d_custom_texts, height=None, key="d_ct_edit" if st.session_state.is_editing_node else "d_ct")
 
-                        # --- НОВОЕ: DefaultNodeID, HideLoadingScreenForReward, PrizeBoxIndex
                         col_d1, col_d2 = st.columns(2)
                         with col_d1:
                             default_d_default_node_id = st.session_state.get('edit_d_default_node_id', 1)
@@ -1364,7 +1372,6 @@ with tab2:
                             default_d_prize_box = st.session_state.get('edit_d_prize_box', -1)
                             prize_box = st.number_input("PrizeBoxIndex (0 = не задано)", value=int(default_d_prize_box), step=1, key="d_prize_box_edit" if st.session_state.is_editing_node else "d_prize_box")
 
-                        # Фиксированная награда для DummyNode (можно расширить)
                         fixed_reward = make_reward("Chips", {"amount": 0})
 
                         if st.session_state.is_editing_node and st.session_state.editing_node_type == "DummyNode":
