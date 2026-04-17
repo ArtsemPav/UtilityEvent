@@ -1,0 +1,31 @@
+live_event_builder/
+├── app.py                         # Точка входа
+├── models/
+│   ├── __init__.py
+│   ├── base.py                    # Базовые классы и ABC
+│   ├── event.py                   # Event, Segment, Stage
+│   ├── nodes.py                   # ProgressNode, EntriesNode, DummyNode
+│   ├── rewards.py                 # Reward, FixedReward, RtpReward и т.д.
+│   ├── goals.py                   # Goal, FixedGoal, SpinpadGoal и т.д.
+│   └── minbet.py                  # FixedMinBet, VariableMinBet
+├── services/
+│   ├── __init__.py
+│   ├── state_manager.py           # Управление session_state
+│   └── json_io.py                 # Загрузка/сохранение, валидация
+├── ui/
+│   ├── __init__.py
+│   ├── widgets/
+│   │   ├── __init__.py
+│   │   ├── minbet_widget.py
+│   │   ├── goal_widget.py
+│   │   ├── reward_widget.py
+│   │   └── node_editor.py         # Универсальный редактор узлов
+│   ├── tabs/
+│   │   ├── __init__.py
+│   │   ├── validation_tab.py
+│   │   ├── editor_tab.py
+│   │   └── export_tab.py
+│   └── common.py                  # Вспомогательные функции UI
+└── utils/
+    ├── __init__.py
+    └── constants.py
