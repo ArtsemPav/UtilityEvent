@@ -184,6 +184,17 @@ class AppState:
             del segment.stages[stage_idx].nodes[node_idx]
             cls.update_event(cls.get_current_event_idx(), event)
 
+    @classmethod
+    def delete_node(cls, event_idx: int, seg_name: str, stage_idx: int, node_idx: int) -> None:
+        """Удаляет узел из указанного события и сегмента."""
+        event = cls.get_event_by_index(event_idx)
+        if event is None or seg_name not in event.segments:
+            return
+        segment = event.segments[seg_name]
+        if 0 <= stage_idx < len(segment.stages) and 0 <= node_idx < len(segment.stages[stage_idx].nodes):
+            del segment.stages[stage_idx].nodes[node_idx]
+            cls.update_event(event_idx, event)
+
     # ---------- Контекст редактирования ----------
     @classmethod
     def start_editing_event(cls, idx: int) -> None:

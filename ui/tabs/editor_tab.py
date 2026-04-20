@@ -1,11 +1,13 @@
+# ui/tabs/editor_tab.py
 import streamlit as st
 from services.state_manager import AppState
-from models.event import PossibleNodeEventData, Segment, make_node_event
+from models.event import PossibleNodeEventData, Segment, Stage, make_node_event
 from models.nodes import Node
 from ui.widgets.node_editor import render_node_editor
 from ui.widgets.event_tree import render_event_tree
 from utils.helpers import parse_comma_separated_list
 from utils.constants import DEFAULT_VIP_RANGE
+
 
 def render_editor_tab():
     # Статусная строка
@@ -44,17 +46,48 @@ def render_editor_tab():
             with st.form(key="event_form"):
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    event_id = st.text_input("EventID", value=event_obj.event_id if event_obj else "MyEvent")
-                    asset_bundle = st.text_input("AssetBundlePath", value=event_obj.asset_bundle_path if event_obj else "_events/MyEvent")
-                    blocker = st.text_input("BlockerPrefabPath", value=event_obj.blocker_prefab_path if event_obj else "Dialogs/MyEvent_Dialog")
-                    node_completion = st.text_input("NodeCompletionPrefabPath", value=event_obj.node_completion_prefab_path if event_obj else "Dialogs/MyEvent_Dialog")
-                    event_card = st.text_input("EventCardPrefabPath", value=event_obj.event_card_prefab_path if event_obj else "")
+                    event_id = st.text_input(
+                        "EventID",
+                        value=event_obj.event_id if event_obj else "MyEvent"
+                    )
+                    asset_bundle = st.text_input(
+                        "AssetBundlePath",
+                        value=event_obj.asset_bundle_path if event_obj else "_events/MyEvent"
+                    )
+                    blocker = st.text_input(
+                        "BlockerPrefabPath",
+                        value=event_obj.blocker_prefab_path if event_obj else "Dialogs/MyEvent_Dialog"
+                    )
+                    node_completion = st.text_input(
+                        "NodeCompletionPrefabPath",
+                        value=event_obj.node_completion_prefab_path if event_obj else "Dialogs/MyEvent_Dialog"
+                    )
+                    event_card = st.text_input(
+                        "EventCardPrefabPath",
+                        value=event_obj.event_card_prefab_path if event_obj else ""
+                    )
                 with col_b:
-                    roundel = st.text_input("RoundelPrefabPath", value=event_obj.roundel_prefab_path if event_obj else "Roundels/MyEvent_Roundel")
-                    content_key = st.text_input("ContentKey", value=event_obj.content_key if event_obj else "MyEvent")
-                    min_level = st.number_input("MinLevel", value=event_obj.min_level if event_obj else 1, min_value=1)
-                    repeats = st.number_input("NumberOfRepeats", value=event_obj.number_of_repeats if event_obj else -1)
-                    segment = st.text_input("Segment (основной)", value=event_obj.segment if event_obj else "Default")
+                    roundel = st.text_input(
+                        "RoundelPrefabPath",
+                        value=event_obj.roundel_prefab_path if event_obj else "Roundels/MyEvent_Roundel"
+                    )
+                    content_key = st.text_input(
+                        "ContentKey",
+                        value=event_obj.content_key if event_obj else "MyEvent"
+                    )
+                    min_level = st.number_input(
+                        "MinLevel",
+                        value=event_obj.min_level if event_obj else 1,
+                        min_value=1
+                    )
+                    repeats = st.number_input(
+                        "NumberOfRepeats",
+                        value=event_obj.number_of_repeats if event_obj else -1
+                    )
+                    segment = st.text_input(
+                        "Segment (основной)",
+                        value=event_obj.segment if event_obj else "Default"
+                    )
 
                 entry_types_str = st.text_input(
                     "EntryTypes (через запятую)",
@@ -64,20 +97,37 @@ def render_editor_tab():
                 # Чекбоксы
                 col_c1, col_c2 = st.columns(2)
                 with col_c1:
-                    is_roundel_hidden = st.checkbox("IsRoundelHidden", value=event_obj.is_roundel_hidden if event_obj else False)
+                    is_roundel_hidden = st.checkbox(
+                        "IsRoundelHidden",
+                        value=event_obj.is_roundel_hidden if event_obj else False
+                    )
                 with col_c2:
-                    show_roundel_all = st.checkbox("ShowRoundelOnAllMachines", value=event_obj.show_roundel_on_all_machines if event_obj else False)
+                    show_roundel_all = st.checkbox(
+                        "ShowRoundelOnAllMachines",
+                        value=event_obj.show_roundel_on_all_machines if event_obj else False
+                    )
 
-                with st.expander("💵 CashOutEvent Settings", expanded=True):
+                with st.expander("💵 CashOutEvent Settings", expanded=False):
                     col_d1, col_d2, col_d3 = st.columns(3)
                     with col_d1:
-                        use_node_failed = st.checkbox("UseNodeFailedNotification", value=event_obj.use_node_failed_notification if event_obj else False)
+                        use_node_failed = st.checkbox(
+                            "UseNodeFailedNotification",
+                            value=event_obj.use_node_failed_notification if event_obj else False
+                        )
                     with col_d2:
-                        is_prize_pursuit = st.checkbox("IsPrizePursuit", value=event_obj.is_prize_pursuit if event_obj else False)
+                        is_prize_pursuit = st.checkbox(
+                            "IsPrizePursuit",
+                            value=event_obj.is_prize_pursuit if event_obj else False
+                        )
                     with col_d3:
-                        use_force_landscape = st.checkbox("UseForceLandscapeOnWeb", value=event_obj.use_force_landscape_on_web if event_obj else False)
+                        use_force_landscape = st.checkbox(
+                            "UseForceLandscapeOnWeb",
+                            value=event_obj.use_force_landscape_on_web if event_obj else False
+                        )
 
-                submitted = st.form_submit_button("💾 Сохранить событие" if editing_event else "➕ Добавить событие")
+                submitted = st.form_submit_button(
+                    "💾 Сохранить событие" if editing_event else "➕ Добавить событие"
+                )
                 if submitted:
                     entry_types = parse_comma_separated_list(entry_types_str)
                     new_event = make_node_event(
@@ -112,7 +162,7 @@ def render_editor_tab():
                     AppState.clear_editing()
                     st.rerun()
 
-        # ШАГ 2: Сегмент
+        # ШАГ 2: Сегмент (с поддержкой RandomSegmentName)
         ctx = AppState.get_editing_context()
         editing_segment = (ctx is not None and ctx["type"] == "segment")
         current_event = AppState.get_current_event()
@@ -121,27 +171,59 @@ def render_editor_tab():
                 if editing_segment:
                     event_idx, seg_obj = AppState.get_editing_segment()
                     st.write(f"✏️ Редактирование сегмента: {seg_obj.name}")
+                    # Определяем тип сегмента по наличию VIP Range
+                    if seg_obj.vip_range:
+                        default_segment_type = "Стандартный (с VIP)"
+                    else:
+                        default_segment_type = "RandomSegmentName (без VIP)"
                 else:
                     seg_obj = None
+                    default_segment_type = "Стандартный (с VIP)"
+
+                # Инициализация session_state для типа сегмента
+                segment_type_key = "segment_type_selector"
+                if segment_type_key not in st.session_state:
+                    st.session_state[segment_type_key] = default_segment_type
+
+                # Используем st.radio с key для автоматического обновления (вне формы)
+                segment_type = st.radio(
+                    "Тип сегмента",
+                    options=["Стандартный (с VIP)", "RandomSegmentName (без VIP)"],
+                    horizontal=True,
+                    key=segment_type_key
+                )
 
                 with st.form(key="segment_form"):
-                    col_a, col_b = st.columns(2)
-                    with col_a:
-                        seg_name = st.text_input(
-                            "Имя сегмента",
-                            value=seg_obj.name if seg_obj else "VIP1_10"
-                        )
-                    with col_b:
-                        vip_range = st.text_input(
-                            "VIP Range",
-                            value=seg_obj.vip_range if seg_obj else DEFAULT_VIP_RANGE
-                        )
+                    if segment_type == "Стандартный (с VIP)":
+                        col_a, col_b = st.columns(2)
+                        with col_a:
+                            seg_name = st.text_input(
+                                "Имя сегмента",
+                                value=seg_obj.name if seg_obj else "VIP1_10"
+                            )
+                        with col_b:
+                            vip_range = st.text_input(
+                                "VIP Range",
+                                value=seg_obj.vip_range if seg_obj and seg_obj.vip_range else DEFAULT_VIP_RANGE
+                            )
+                    else:  # RandomSegmentName
+                        col_a, _ = st.columns(2)
+                        with col_a:
+                            seg_name = st.text_input(
+                                "Имя сегмента",
+                                value=seg_obj.name if seg_obj else "RandomSegmentName"
+                            )
+                        vip_range = ""  # Пустая строка означает отсутствие VIP
 
                     submitted = st.form_submit_button(
                         "💾 Сохранить сегмент" if editing_segment else "➕ Добавить сегмент"
                     )
                     if submitted:
-                        new_seg = Segment(name=seg_name, vip_range=vip_range)
+                        if segment_type == "Стандартный (с VIP)":
+                            new_seg = Segment(name=seg_name, vip_range=vip_range)
+                        else:  # RandomSegmentName
+                            new_seg = Segment(name=seg_name, vip_range="")
+
                         if editing_segment:
                             old_name = ctx["name"]
                             AppState.update_segment(ctx["event_idx"], old_name, new_seg)
@@ -150,9 +232,14 @@ def render_editor_tab():
                         else:
                             AppState.add_segment(AppState.get_current_event_idx(), new_seg)
                             st.success("✅ Сегмент добавлен")
+                        # Очищаем состояние после сохранения
+                        if segment_type_key in st.session_state:
+                            del st.session_state[segment_type_key]
                         st.rerun()
 
                 if editing_segment and st.button("❌ Отменить редактирование сегмента"):
+                    if segment_type_key in st.session_state:
+                        del st.session_state[segment_type_key]
                     AppState.clear_editing()
                     st.rerun()
 
@@ -206,7 +293,6 @@ def render_editor_tab():
         with c2:
             if st.button("➕ Добавить ещё сегмент", use_container_width=True):
                 AppState.clear_editing()
-                # Просто переключаем режим, но оставляем текущее событие
                 st.rerun()
 
     with right_col:

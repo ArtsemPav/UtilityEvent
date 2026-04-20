@@ -29,12 +29,19 @@ class Segment(Serializable):
     stages: List[Stage] = field(default_factory=lambda: [Stage(stage_id=1)])
 
     def to_dict(self) -> dict:
-        return {
-            self.name: {
-                "Stages": [s.to_dict() for s in self.stages],
-                "PossibleSegmentInfo": {"VIPRange": self.vip_range}
+        if self.vip_range:
+            return {
+                self.name: {
+                    "Stages": [s.to_dict() for s in self.stages],
+                    "PossibleSegmentInfo": {"VIPRange": self.vip_range}
+                }
             }
-        }
+        else:
+            return {
+                self.name: {
+                    "Stages": [s.to_dict() for s in self.stages]
+                }
+            }
 
     @classmethod
     def from_dict(cls, name: str, data: dict):
@@ -74,25 +81,25 @@ class PossibleNodeEventData(Serializable):
         return {
             "PossibleNodeEventData": {
                 "EventID": self.event_id,
-                "MinLevel": self.min_level,
-                "Segment": self.segment,
                 "AssetBundlePath": self.asset_bundle_path,
                 "BlockerPrefabPath": self.blocker_prefab_path,
                 "RoundelPrefabPath": self.roundel_prefab_path,
                 "EventCardPrefabPath": self.event_card_prefab_path,
                 "NodeCompletionPrefabPath": self.node_completion_prefab_path,
                 "ContentKey": self.content_key,
+                "MinLevel": self.min_level,
                 "NumberOfRepeats": self.number_of_repeats,
+                "IsRoundelHidden": self.is_roundel_hidden,                
+                "ShowRoundelOnAllMachines": self.show_roundel_on_all_machines,               
+                "IsPrizePursuit": self.is_prize_pursuit,
+                "UseNodeFailedNotification": self.use_node_failed_notification,
+                "UseForceLandscapeOnWeb": self.use_force_landscape_on_web,
+                "IsCurrencyEvent": self.is_currency_event,               
                 "StartingEventCurrency": self.starting_event_currency,
-                "IsCurrencyEvent": self.is_currency_event,
                 "TimeWarning": self.time_warning,
                 "EntryTypes": self.entry_types,
+                "Segment": self.segment,
                 "Segments": segments_dict,
-                "IsRoundelHidden": self.is_roundel_hidden,
-                "UseNodeFailedNotification": self.use_node_failed_notification,
-                "IsPrizePursuit": self.is_prize_pursuit,
-                "UseForceLandscapeOnWeb": self.use_force_landscape_on_web,
-                "ShowRoundelOnAllMachines": self.show_roundel_on_all_machines,
             }
         }
 
