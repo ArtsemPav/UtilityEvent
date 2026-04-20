@@ -1,4 +1,3 @@
-# ui/tabs/editor_tab.py
 import streamlit as st
 from services.state_manager import AppState
 from models.event import PossibleNodeEventData, Segment, Stage, make_node_event
@@ -8,20 +7,21 @@ from ui.widgets.event_tree import render_event_tree
 from utils.helpers import parse_comma_separated_list
 from utils.constants import DEFAULT_VIP_RANGE
 
-
 def render_editor_tab():
+    app_state = AppState.get_instance()
+
     # Статусная строка
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.info(f"📊 Всего событий: {len(AppState.get_events_raw())}")
+        st.info(f"📊 Всего событий: {len(app_state.get_events_raw())}")
     with col2:
-        cur_event = AppState.get_current_event()
+        cur_event = app_state.get_current_event()
         if cur_event:
             st.info(f"✏️ Текущее: {cur_event.event_id}")
         else:
             st.info("✏️ Нет текущего события")
     with col3:
-        ctx = AppState.get_editing_context()
+        ctx = app_state.get_editing_context()
         if ctx:
             mode = f"Редактирование {ctx['type']}"
         else:
@@ -34,11 +34,11 @@ def render_editor_tab():
 
     with left_col:
         # ШАГ 1: Событие
-        ctx = AppState.get_editing_context()
+        ctx = app_state.get_editing_context()
         editing_event = (ctx is not None and ctx["type"] == "event")
         with st.expander("📋 ШАГ 1: Создание / редактирование события", expanded=(ctx is None or editing_event)):
             if editing_event:
-                event_obj = AppState.get_editing_event()
+                event_obj = app_state.get_editing_event_copy()
                 st.write(f"✏️ Редактирование: {event_obj.event_id}")
             else:
                 event_obj = None
@@ -94,7 +94,6 @@ def render_editor_tab():
                     value=",".join(event_obj.entry_types) if event_obj else ""
                 )
 
-                # Чекбоксы
                 col_c1, col_c2 = st.columns(2)
                 with col_c1:
                     is_roundel_hidden = st.checkbox(
@@ -130,48 +129,64 @@ def render_editor_tab():
                 )
                 if submitted:
                     entry_types = parse_comma_separated_list(entry_types_str)
-                    new_event = make_node_event(
-                        event_id=event_id,
-                        min_level=int(min_level),
-                        segment=segment,
-                        asset_bundle_path=asset_bundle,
-                        blocker_prefab_path=blocker,
-                        roundel_prefab_path=roundel,
-                        event_card_prefab_path=event_card,
-                        node_completion_prefab_path=node_completion,
-                        content_key=content_key,
-                        number_of_repeats=int(repeats),
-                        entry_types=entry_types,
-                        segments=event_obj.segments if event_obj else {},
-                        is_roundel_hidden=is_roundel_hidden,
-                        use_node_failed_notification=use_node_failed,
-                        is_prize_pursuit=is_prize_pursuit,
-                        use_force_landscape_on_web=use_force_landscape,
-                        show_roundel_on_all_machines=show_roundel_all,
-                    )
                     if editing_event:
-                        AppState.update_event(ctx["index"], new_event)
-                        AppState.clear_editing()
+                        # Обновляем копию
+                        event_obj.event_id = event_id
+                        event_obj.min_level = int(min_level)
+                        event_obj.segment = segment
+                        event_obj.asset_bundle_path = asset_bundle
+                        event_obj.blocker_prefab_path = blocker
+                        event_obj.roundel_prefab_path = roundel
+                        event_obj.event_card_prefab_path = event_card
+                        event_obj.node_completion_prefab_path = node_completion
+                        event_obj.content_key = content_key
+                        event_obj.number_of_repeats = int(repeats)
+                        event_obj.entry_types = entry_types
+                        event_obj.is_roundel_hidden = is_roundel_hidden
+                        event_obj.use_node_failed_notification = use_node_failed
+                        event_obj.is_prize_pursuit = is_prize_pursuit
+                        event_obj.use_force_landscape_on_web = use_force_landscape
+                        event_obj.show_roundel_on_all_machines = show_roundel_all
+                        # Применяем изменения
+                        app_state.apply_editing()
                         st.success("✅ Событие обновлено")
                     else:
-                        AppState.add_event(new_event)
+                        new_event = make_node_event(
+                            event_id=event_id,
+                            min_level=int(min_level),
+                            segment=segment,
+                            asset_bundle_path=asset_bundle,
+                            blocker_prefab_path=blocker,
+                            roundel_prefab_path=roundel,
+                            event_card_prefab_path=event_card,
+                            node_completion_prefab_path=node_completion,
+                            content_key=content_key,
+                            number_of_repeats=int(repeats),
+                            entry_types=entry_types,
+                            segments=event_obj.segments if event_obj else {},
+                            is_roundel_hidden=is_roundel_hidden,
+                            use_node_failed_notification=use_node_failed,
+                            is_prize_pursuit=is_prize_pursuit,
+                            use_force_landscape_on_web=use_force_landscape,
+                            show_roundel_on_all_machines=show_roundel_all,
+                        )
+                        app_state.add_event(new_event)
                         st.success("✅ Событие добавлено")
                     st.rerun()
 
                 if editing_event and st.button("❌ Отменить редактирование"):
-                    AppState.clear_editing()
+                    app_state.clear_editing()
                     st.rerun()
 
-        # ШАГ 2: Сегмент (с поддержкой RandomSegmentName)
-        ctx = AppState.get_editing_context()
+        # ШАГ 2: Сегмент
+        ctx = app_state.get_editing_context()
         editing_segment = (ctx is not None and ctx["type"] == "segment")
-        current_event = AppState.get_current_event()
+        current_event = app_state.get_current_event()
         if current_event:
             with st.expander("📁 ШАГ 2: Создание / редактирование сегмента", expanded=editing_segment):
                 if editing_segment:
-                    event_idx, seg_obj = AppState.get_editing_segment()
+                    event_idx, old_name, seg_obj = app_state.get_editing_segment_copy()
                     st.write(f"✏️ Редактирование сегмента: {seg_obj.name}")
-                    # Определяем тип сегмента по наличию VIP Range
                     if seg_obj.vip_range:
                         default_segment_type = "Стандартный (с VIP)"
                     else:
@@ -180,12 +195,10 @@ def render_editor_tab():
                     seg_obj = None
                     default_segment_type = "Стандартный (с VIP)"
 
-                # Инициализация session_state для типа сегмента
                 segment_type_key = "segment_type_selector"
                 if segment_type_key not in st.session_state:
                     st.session_state[segment_type_key] = default_segment_type
 
-                # Используем st.radio с key для автоматического обновления (вне формы)
                 segment_type = st.radio(
                     "Тип сегмента",
                     options=["Стандартный (с VIP)", "RandomSegmentName (без VIP)"],
@@ -206,14 +219,14 @@ def render_editor_tab():
                                 "VIP Range",
                                 value=seg_obj.vip_range if seg_obj and seg_obj.vip_range else DEFAULT_VIP_RANGE
                             )
-                    else:  # RandomSegmentName
+                    else:
                         col_a, _ = st.columns(2)
                         with col_a:
                             seg_name = st.text_input(
                                 "Имя сегмента",
                                 value=seg_obj.name if seg_obj else "RandomSegmentName"
                             )
-                        vip_range = ""  # Пустая строка означает отсутствие VIP
+                        vip_range = ""
 
                     submitted = st.form_submit_button(
                         "💾 Сохранить сегмент" if editing_segment else "➕ Добавить сегмент"
@@ -221,18 +234,18 @@ def render_editor_tab():
                     if submitted:
                         if segment_type == "Стандартный (с VIP)":
                             new_seg = Segment(name=seg_name, vip_range=vip_range)
-                        else:  # RandomSegmentName
+                        else:
                             new_seg = Segment(name=seg_name, vip_range="")
 
                         if editing_segment:
-                            old_name = ctx["name"]
-                            AppState.update_segment(ctx["event_idx"], old_name, new_seg)
-                            AppState.clear_editing()
+                            # Обновляем копию
+                            seg_obj.name = seg_name
+                            seg_obj.vip_range = vip_range if segment_type == "Стандартный (с VIP)" else ""
+                            app_state.apply_editing()
                             st.success("✅ Сегмент обновлён")
                         else:
-                            AppState.add_segment(AppState.get_current_event_idx(), new_seg)
+                            app_state.add_segment(app_state.get_current_event_idx(), new_seg)
                             st.success("✅ Сегмент добавлен")
-                        # Очищаем состояние после сохранения
                         if segment_type_key in st.session_state:
                             del st.session_state[segment_type_key]
                         st.rerun()
@@ -240,17 +253,17 @@ def render_editor_tab():
                 if editing_segment and st.button("❌ Отменить редактирование сегмента"):
                     if segment_type_key in st.session_state:
                         del st.session_state[segment_type_key]
-                    AppState.clear_editing()
+                    app_state.clear_editing()
                     st.rerun()
 
         # ШАГ 3: Узел
-        ctx = AppState.get_editing_context()
+        ctx = app_state.get_editing_context()
         editing_node = (ctx is not None and ctx["type"] == "node")
-        current_segment = AppState.get_current_segment()
+        current_segment = app_state.get_current_segment()
         if current_event and current_segment:
             with st.expander("🔧 ШАГ 3: Создание / редактирование ноды", expanded=editing_node):
                 if editing_node:
-                    _, _, stage_idx, node_idx, node_obj = AppState.get_editing_node()
+                    _, _, _, _, node_obj = app_state.get_editing_node_copy()
                     node_type = type(node_obj).__name__
                     st.write(f"✏️ Редактирование {node_type} (ID: {node_obj.node_id})")
                 else:
@@ -261,38 +274,34 @@ def render_editor_tab():
                     )
                     node_obj = None
 
-                # Рендерим редактор (если редактируем, передаём существующий объект)
-                if editing_node:
-                    result_node = render_node_editor(node_type, node_obj, key_prefix="edit_node")
-                else:
-                    result_node = render_node_editor(node_type, None, key_prefix="new_node")
+                result_node = render_node_editor(node_type, node_obj, key_prefix="edit_node" if editing_node else "new_node")
 
-                # Если форма была отправлена, result_node не None
                 if result_node is not None:
                     if editing_node:
-                        AppState.update_node_in_current_segment(stage_idx, node_idx, result_node)
-                        AppState.clear_editing()
+                        # Обновляем копию узла
+                        ctx = app_state.get_editing_context()
+                        ctx["copy"] = result_node
+                        app_state.apply_editing()
                         st.success("✅ Нода обновлена")
                     else:
-                        AppState.add_node_to_current_segment(result_node)
+                        app_state.add_node_to_current_segment(result_node)
                         st.success("✅ Нода добавлена")
                     st.rerun()
 
                 if editing_node and st.button("❌ Отменить редактирование ноды"):
-                    AppState.clear_editing()
+                    app_state.clear_editing()
                     st.rerun()
 
-        # Кнопки управления
         st.divider()
         c1, c2, c3 = st.columns(3)
         with c1:
             if st.button("🔄 Начать новое событие", use_container_width=True):
-                AppState.set_current_event_idx(-1)
-                AppState.clear_editing()
+                app_state.set_current_event_idx(-1)
+                app_state.clear_editing()
                 st.rerun()
         with c2:
             if st.button("➕ Добавить ещё сегмент", use_container_width=True):
-                AppState.clear_editing()
+                app_state.clear_editing()
                 st.rerun()
 
     with right_col:

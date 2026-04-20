@@ -3,7 +3,7 @@ from .widgets import (
     render_minbet_widget,
     render_goal_widget,
     render_reward_widget,
-    render_rewards_list,
+    render_rewards_editor,          # вместо render_rewards_list
     render_progress_node_form,
     render_entries_node_form,
     render_dummy_node_form,
@@ -22,7 +22,7 @@ __all__ = [
     "render_minbet_widget",
     "render_goal_widget",
     "render_reward_widget",
-    "render_rewards_list",
+    "render_rewards_editor",
     "render_progress_node_form",
     "render_entries_node_form",
     "render_dummy_node_form",

@@ -1,6 +1,5 @@
-# ui/widgets/reward_widget.py
 import streamlit as st
-from typing import List, Optional
+from typing import Optional
 from models.rewards import (
     Reward,
     FixedReward,
@@ -136,83 +135,3 @@ def render_reward_widget(prefix: str, index: int, existing: Optional[Reward] = N
             return Reward(data=FixedReward(currency=curr, amount=float(amount)))
 
     return Reward(data=FixedReward(currency="Chips", amount=0.0))
-
-
-def render_rewards_list(prefix: str, existing: List[Reward], editable: bool = True) -> List[Reward]:
-    """
-    Отображает список наград.
-    Если editable=False, только показывает награды без возможности редактирования.
-    Возвращает список наград (может быть изменён, если editable=True).
-    """
-    rewards = list(existing)
-    st.write("**Награды:**")
-
-    # --- Только чтение ---
-    if not editable:
-        if not rewards:
-            st.info("Нет наград")
-        for i, reward in enumerate(rewards):
-            data = reward.data
-            if isinstance(data, FixedReward):
-                desc = f"{i+1}. 💰 {data.amount} {data.currency}"
-            elif isinstance(data, RtpReward):
-                desc = f"{i+1}. 📊 RTP {data.percentage*100:.1f}% Chips ({data.min}-{data.max})"
-            elif isinstance(data, FreeplayUnlockReward):
-                desc = f"{i+1}. 🎰 {data.spins} Free Spins on {data.game_name}"
-            elif isinstance(data, CollectableSellPacksReward):
-                desc = f"{i+1}. 📦 {data.num_packs}x Pack {data.pack_id}"
-            else:
-                desc = f"{i+1}. {type(data).__name__}"
-            st.write(desc)
-        return rewards
-
-    # --- Редактируемый режим (вне форм) ---
-    delete_indices = []
-    for i, reward in enumerate(rewards):
-        cols = st.columns([4, 1, 1])
-        with cols[0]:
-            data = reward.data
-            if isinstance(data, FixedReward):
-                desc = f"💰 {data.amount} {data.currency}"
-            elif isinstance(data, RtpReward):
-                desc = f"📊 RTP {data.percentage*100:.1f}% Chips ({data.min}-{data.max})"
-            elif isinstance(data, FreeplayUnlockReward):
-                desc = f"🎰 {data.spins} Free Spins on {data.game_name}"
-            elif isinstance(data, CollectableSellPacksReward):
-                desc = f"📦 {data.num_packs}x Pack {data.pack_id}"
-            else:
-                desc = str(data)
-            st.write(f"{i+1}. {desc}")
-
-        with cols[1]:
-            if st.button("✏️", key=f"{prefix}_edit_reward_{i}"):
-                st.session_state[f"{prefix}_editing_reward_idx"] = i
-                st.rerun()
-        with cols[2]:
-            if st.button("❌", key=f"{prefix}_del_reward_{i}"):
-                delete_indices.append(i)
-
-    if delete_indices:
-        for idx in sorted(delete_indices, reverse=True):
-            del rewards[idx]
-        st.rerun()
-
-    editing_idx = st.session_state.get(f"{prefix}_editing_reward_idx", -1)
-    if editing_idx >= 0 and editing_idx < len(rewards):
-        with st.expander(f"✏️ Редактирование награды #{editing_idx+1}", expanded=True):
-            new_reward = render_reward_widget(prefix, editing_idx, rewards[editing_idx])
-            if st.button("💾 Сохранить изменения", key=f"{prefix}_save_reward_{editing_idx}"):
-                rewards[editing_idx] = new_reward
-                del st.session_state[f"{prefix}_editing_reward_idx"]
-                st.rerun()
-            if st.button("❌ Отмена", key=f"{prefix}_cancel_edit_{editing_idx}"):
-                del st.session_state[f"{prefix}_editing_reward_idx"]
-                st.rerun()
-
-    with st.expander("➕ Добавить новую награду"):
-        new_reward = render_reward_widget(prefix, len(rewards))
-        if st.button("✅ Добавить награду", key=f"{prefix}_add_reward"):
-            rewards.append(new_reward)
-            st.rerun()
-
-    return rewards

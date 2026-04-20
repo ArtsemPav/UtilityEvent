@@ -7,8 +7,8 @@ from ui.tabs.export_tab import render_export_tab
 st.set_page_config(page_title="LiveEvent JSON Builder", layout="wide")
 st.title("🎮 LiveEvent JSON Builder")
 
-# Инициализация состояния
-AppState.init()
+# Инициализация состояния (автоматически при первом вызове get_instance)
+AppState.get_instance()
 
 tab1, tab2, tab3 = st.tabs(["📁 Загрузка и валидация", "⚙️ Настройка события", "🌳 Структура и сохранение"])
 

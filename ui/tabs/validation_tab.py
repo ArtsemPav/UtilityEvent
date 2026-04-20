@@ -1,8 +1,10 @@
 import streamlit as st
+import json
 from services.json_io import load_config_from_json, validate_config
 from services.state_manager import AppState
 
 def render_validation_tab():
+    app_state = AppState.get_instance()
     st.header("Загрузка и валидация JSON")
     col1, col2 = st.columns(2)
     with col1:
@@ -10,7 +12,7 @@ def render_validation_tab():
         if uploaded:
             try:
                 cfg = load_config_from_json(uploaded.read())
-                AppState.set_cfg(cfg)
+                app_state.set_cfg(cfg)
                 st.success("JSON загружен")
             except Exception as e:
                 st.error(f"Ошибка: {e}")
@@ -20,12 +22,13 @@ def render_validation_tab():
         if schema_file:
             schema = json.load(schema_file)
         if st.button("Проверить валидацию"):
-            if validate_config(AppState.get_cfg(), schema):
+            valid, msg = validate_config(app_state.get_cfg(), schema)
+            if valid:
                 st.success("Валиден")
             else:
-                st.error("Не валиден")
+                st.error(f"Не валиден: {msg}")
 
     with col2:
         if st.button("Создать новый конфиг"):
-            AppState.set_cfg({"Events": [], "IsFallbackConfig": False})
+            app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
             st.success("Создан")
