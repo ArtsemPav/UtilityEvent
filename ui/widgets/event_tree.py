@@ -65,6 +65,7 @@ def render_event_tree():
                         st.write("      📭 Нет узлов")
                         continue
 
+                    # Ключ для хранения состояния (показать все / не все)
                     show_all_key = f"tree_show_all_{idx}_{seg_name}"
                     if show_all_key not in st.session_state:
                         st.session_state[show_all_key] = False
@@ -90,12 +91,15 @@ def render_event_tree():
                                 st.rerun()
 
                     if total_nodes > MAX_NODES_PER_SEGMENT:
+                        # Ключи для кнопок – отдельные, не конфликтующие с show_all_key
                         if st.session_state[show_all_key]:
-                            if st.button(f"⬆️ Скрыть узлы (показано {total_nodes})", key=f"tree_hide_nodes_{idx}_{seg_name}"):
+                            hide_btn_key = f"btn_hide_nodes_{idx}_{seg_name}"
+                            if st.button(f"⬆️ Скрыть узлы (показано {total_nodes})", key=hide_btn_key):
                                 st.session_state[show_all_key] = False
                                 st.rerun()
                         else:
+                            show_btn_key = f"btn_show_nodes_{idx}_{seg_name}"
                             remaining = total_nodes - MAX_NODES_PER_SEGMENT
-                            if st.button(f"⬇️ Показать ещё {remaining} узлов (всего {total_nodes})", key=f"tree_show_all_{idx}_{seg_name}"):
+                            if st.button(f"⬇️ Показать ещё {remaining} узлов (всего {total_nodes})", key=show_btn_key):
                                 st.session_state[show_all_key] = True
                                 st.rerun()
