@@ -43,6 +43,16 @@ def render_editor_tab():
             else:
                 event_obj = None
 
+            def is_event_id_duplicate(new_event_id: str, current_event_id: str = None) -> bool:
+                events = app_state.get_events_raw()
+                for event_dict in events:
+                    existing_id = event_dict.get("PossibleNodeEventData", {}).get("EventID")
+                    if existing_id == new_event_id:
+                        if current_event_id is not None and existing_id == current_event_id:
+                            continue
+                        return True
+                return False
+
             with st.form(key="event_form"):
                 col_a, col_b = st.columns(2)
                 with col_a:
@@ -129,59 +139,91 @@ def render_editor_tab():
                 )
                 if submitted:
                     entry_types = parse_comma_separated_list(entry_types_str)
-                    if editing_event:
-                        # Обновляем копию
-                        event_obj.event_id = event_id
-                        event_obj.min_level = int(min_level)
-                        event_obj.segment = segment
-                        event_obj.asset_bundle_path = asset_bundle
-                        event_obj.blocker_prefab_path = blocker
-                        event_obj.roundel_prefab_path = roundel
-                        event_obj.event_card_prefab_path = event_card
-                        event_obj.node_completion_prefab_path = node_completion
-                        event_obj.content_key = content_key
-                        event_obj.number_of_repeats = int(repeats)
-                        event_obj.entry_types = entry_types
-                        event_obj.is_roundel_hidden = is_roundel_hidden
-                        event_obj.use_node_failed_notification = use_node_failed
-                        event_obj.is_prize_pursuit = is_prize_pursuit
-                        event_obj.use_force_landscape_on_web = use_force_landscape
-                        event_obj.show_roundel_on_all_machines = show_roundel_all
-                        # Применяем изменения
-                        app_state.apply_editing()
-                        st.success("✅ Событие обновлено")
+                    current_id = event_obj.event_id if editing_event else None
+                    if is_event_id_duplicate(event_id, current_id):
+                        st.error(f"❌ Событие с EventID '{event_id}' уже существует. Используйте уникальное имя.")
                     else:
-                        new_event = make_node_event(
-                            event_id=event_id,
-                            min_level=int(min_level),
-                            segment=segment,
-                            asset_bundle_path=asset_bundle,
-                            blocker_prefab_path=blocker,
-                            roundel_prefab_path=roundel,
-                            event_card_prefab_path=event_card,
-                            node_completion_prefab_path=node_completion,
-                            content_key=content_key,
-                            number_of_repeats=int(repeats),
-                            entry_types=entry_types,
-                            segments=event_obj.segments if event_obj else {},
-                            is_roundel_hidden=is_roundel_hidden,
-                            use_node_failed_notification=use_node_failed,
-                            is_prize_pursuit=is_prize_pursuit,
-                            use_force_landscape_on_web=use_force_landscape,
-                            show_roundel_on_all_machines=show_roundel_all,
-                        )
-                        app_state.add_event(new_event)
-                        st.success("✅ Событие добавлено")
-                    st.rerun()
+                        if editing_event:
+                            event_obj.event_id = event_id
+                            event_obj.min_level = int(min_level)
+                            event_obj.segment = segment
+                            event_obj.asset_bundle_path = asset_bundle
+                            event_obj.blocker_prefab_path = blocker
+                            event_obj.roundel_prefab_path = roundel
+                            event_obj.event_card_prefab_path = event_card
+                            event_obj.node_completion_prefab_path = node_completion
+                            event_obj.content_key = content_key
+                            event_obj.number_of_repeats = int(repeats)
+                            event_obj.entry_types = entry_types
+                            event_obj.is_roundel_hidden = is_roundel_hidden
+                            event_obj.use_node_failed_notification = use_node_failed
+                            event_obj.is_prize_pursuit = is_prize_pursuit
+                            event_obj.use_force_landscape_on_web = use_force_landscape
+                            event_obj.show_roundel_on_all_machines = show_roundel_all
+                            app_state.apply_editing()
+                            st.success("✅ Событие обновлено")
+                        else:
+                            new_event = make_node_event(
+                                event_id=event_id,
+                                min_level=int(min_level),
+                                segment=segment,
+                                asset_bundle_path=asset_bundle,
+                                blocker_prefab_path=blocker,
+                                roundel_prefab_path=roundel,
+                                event_card_prefab_path=event_card,
+                                node_completion_prefab_path=node_completion,
+                                content_key=content_key,
+                                number_of_repeats=int(repeats),
+                                entry_types=entry_types,
+                                segments=event_obj.segments if event_obj else {},
+                                is_roundel_hidden=is_roundel_hidden,
+                                use_node_failed_notification=use_node_failed,
+                                is_prize_pursuit=is_prize_pursuit,
+                                use_force_landscape_on_web=use_force_landscape,
+                                show_roundel_on_all_machines=show_roundel_all,
+                            )
+                            app_state.add_event(new_event)
+                            st.success("✅ Событие добавлено")
+                        st.rerun()
 
-                if editing_event and st.button("❌ Отменить редактирование"):
-                    app_state.clear_editing()
-                    st.rerun()
+            if editing_event and st.button("❌ Отменить редактирование"):
+                app_state.clear_editing()
+                st.rerun()
 
         # ШАГ 2: Сегмент
         ctx = app_state.get_editing_context()
         editing_segment = (ctx is not None and ctx["type"] == "segment")
         current_event = app_state.get_current_event()
+
+        def has_segment_type_conflict(event: PossibleNodeEventData, new_vip_range: str, old_name: str = None) -> tuple[bool, str]:
+            """
+            Проверяет конфликт типов сегментов.
+            Возвращает (True, сообщение) если конфликт есть, иначе (False, "").
+            """
+            vip_count = 0
+            non_vip_count = 0
+            for name, seg in event.segments.items():
+                if name == old_name:
+                    continue
+                if seg.vip_range == "":
+                    non_vip_count += 1
+                else:
+                    vip_count += 1
+
+            is_new_non_vip = (new_vip_range == "")
+
+            # Если новый сегмент без VIP
+            if is_new_non_vip:
+                if vip_count > 0:
+                    return True, "❌ Нельзя добавить сегмент без VIP, когда уже есть VIP-сегменты."
+                if non_vip_count >= 1:
+                    return True, "❌ В событии уже есть сегмент без VIP. Можно иметь только один такой сегмент."
+            else:
+                # Новый сегмент с VIP
+                if non_vip_count > 0:
+                    return True, "❌ Нельзя добавить VIP-сегмент, когда уже есть сегмент без VIP."
+            return False, ""
+
         if current_event:
             with st.expander("📁 ШАГ 2: Создание / редактирование сегмента", expanded=editing_segment):
                 if editing_segment:
@@ -232,23 +274,28 @@ def render_editor_tab():
                         "💾 Сохранить сегмент" if editing_segment else "➕ Добавить сегмент"
                     )
                     if submitted:
-                        if segment_type == "Стандартный (с VIP)":
-                            new_seg = Segment(name=seg_name, vip_range=vip_range)
+                        conflict, msg = has_segment_type_conflict(
+                            current_event, vip_range,
+                            old_name if editing_segment else None
+                        )
+                        if conflict:
+                            st.error(msg)
                         else:
-                            new_seg = Segment(name=seg_name, vip_range="")
-
-                        if editing_segment:
-                            # Обновляем копию
-                            seg_obj.name = seg_name
-                            seg_obj.vip_range = vip_range if segment_type == "Стандартный (с VIP)" else ""
-                            app_state.apply_editing()
-                            st.success("✅ Сегмент обновлён")
-                        else:
-                            app_state.add_segment(app_state.get_current_event_idx(), new_seg)
-                            st.success("✅ Сегмент добавлен")
-                        if segment_type_key in st.session_state:
-                            del st.session_state[segment_type_key]
-                        st.rerun()
+                            if segment_type == "Стандартный (с VIP)":
+                                new_seg = Segment(name=seg_name, vip_range=vip_range)
+                            else:
+                                new_seg = Segment(name=seg_name, vip_range="")
+                            if editing_segment:
+                                seg_obj.name = seg_name
+                                seg_obj.vip_range = vip_range if segment_type == "Стандартный (с VIP)" else ""
+                                app_state.apply_editing()
+                                st.success("✅ Сегмент обновлён")
+                            else:
+                                app_state.add_segment(app_state.get_current_event_idx(), new_seg)
+                                st.success("✅ Сегмент добавлен")
+                            if segment_type_key in st.session_state:
+                                del st.session_state[segment_type_key]
+                            st.rerun()
 
                 if editing_segment and st.button("❌ Отменить редактирование сегмента"):
                     if segment_type_key in st.session_state:
@@ -278,7 +325,6 @@ def render_editor_tab():
 
                 if result_node is not None:
                     if editing_node:
-                        # Обновляем копию узла
                         ctx = app_state.get_editing_context()
                         ctx["copy"] = result_node
                         app_state.apply_editing()
@@ -292,6 +338,7 @@ def render_editor_tab():
                     app_state.clear_editing()
                     st.rerun()
 
+        # Кнопки управления
         st.divider()
         c1, c2, c3 = st.columns(3)
         with c1:
