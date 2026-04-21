@@ -6,7 +6,7 @@ def render_export_tab():
     app_state = AppState.get_instance()
     st.header("🌳 Структура и сохранение")
 
-    with st.expander("📄 Полный JSON", expanded=False):
+    with st.expander("📄 Полный JSON (развернуть для просмотра)", expanded=False):
         st.json(app_state.get_cfg())
 
     st.download_button(
