@@ -151,6 +151,10 @@ def _load_with_header_detection(uploaded_file) -> pd.DataFrame:
 
 def render_import_tab():
     st.subheader("📥 Пакетный импорт сегментов и узлов")
+    render_batch_import_panel(key="import_tab")
+
+
+def render_batch_import_panel(key: str = "editor_tab"):
 
     with st.expander("ℹ️ Справка по формату файла", expanded=False):
         st.markdown("""
@@ -179,7 +183,7 @@ def render_import_tab():
 | Num Packs | NumPacks, num_packs |
         """)
 
-    uploaded_file = st.file_uploader("Выберите файл", type=["csv", "xlsx", "xls"])
+    uploaded_file = st.file_uploader("Выберите файл", type=["csv", "xlsx", "xls"], key=f"file_uploader_{key}")
     if uploaded_file is None:
         return
 

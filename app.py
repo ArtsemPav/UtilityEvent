@@ -13,21 +13,13 @@ app_state = AppState.get_instance()
 if app_state.get_current_event_idx() == -1 and len(app_state.get_events_raw()) > 0:
     app_state.set_current_event_idx(0)
 
-tab_load, tab_editor, tab_import, tab_export = st.tabs([
-    "📂 Загрузка / Валидация",
+tab_editor, tab_export = st.tabs([
     "✏️ Редактор",
-    "📥 Пакетный импорт",
     "💾 Экспорт",
 ])
 
-with tab_load:
-    render_validation_tab()
-
 with tab_editor:
     render_editor_tab()
-
-with tab_import:
-    render_import_tab()
 
 with tab_export:
     render_export_tab()

@@ -15,6 +15,12 @@ def render_event_tree():
         app_state.start_editing_node(idx, seg_name, stage_idx, node_idx)
         st.rerun()
 
+    if st.button("➕ Добавить событие", key="tree_add_event", use_container_width=True):
+        app_state.set_current_event_idx(-1)
+        app_state.clear_editing()
+        st.session_state["creating_event"] = True
+        st.rerun()
+
     events_raw = app_state.get_events_raw()
     if not events_raw:
         st.info("📭 Нет сохранённых событий")
@@ -63,6 +69,22 @@ def render_event_tree():
                     app_state.delete_event(idx)
                     st.rerun()
 
+            if st.button("📥 Пакетный импорт", key=f"tree_batch_import_{idx}", use_container_width=True):
+                app_state.set_current_event_idx(idx)
+                app_state.clear_editing()
+                st.session_state["creating_event"] = False
+                st.session_state["creating_segment"] = False
+                st.session_state["creating_node"] = False
+                st.session_state["batch_import_event_idx"] = idx
+                st.rerun()
+
+            if st.button("➕ Добавить сегмент", key=f"tree_add_seg_{idx}", use_container_width=True):
+                app_state.set_current_event_idx(idx)
+                app_state.clear_editing()
+                st.session_state["creating_event"] = False
+                st.session_state["creating_segment"] = True
+                st.rerun()
+
             segments = event_data.get("Segments", {})
             if not segments:
                 st.write("   📭 Нет сегментов")
@@ -84,6 +106,15 @@ def render_event_tree():
                         if st.button("❌", key=f"tree_del_seg_{idx}_{seg_name}"):
                             app_state.delete_segment(idx, seg_name)
                             st.rerun()
+
+                    if st.button("➕ Добавить ноду", key=f"tree_add_node_{idx}_{seg_name}", use_container_width=True):
+                        app_state.set_current_event_idx(idx)
+                        app_state.set_current_segment_name(seg_name)
+                        app_state.clear_editing()
+                        st.session_state["creating_event"] = False
+                        st.session_state["creating_segment"] = False
+                        st.session_state["creating_node"] = True
+                        st.rerun()
 
                     stages = seg_data.get("Stages", [])
                     if not stages:
