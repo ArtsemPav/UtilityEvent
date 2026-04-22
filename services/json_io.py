@@ -7,8 +7,16 @@ def load_config_from_json(file_content: bytes) -> dict:
     Загружает конфиг из байтового содержимого JSON-файла.
     Выполняет минимальную инициализацию обязательных полей.
     """
-    # json.loads быстрее чем любые обёртки — используем напрямую
-    data = json.loads(file_content.decode("utf-8"))
+    # Пробуем utf-8, затем utf-8-sig (BOM), затем cp1251
+    for encoding in ("utf-8", "utf-8-sig", "cp1251", "latin-1"):
+        try:
+            text = file_content.decode(encoding)
+            break
+        except (UnicodeDecodeError, LookupError):
+            continue
+    else:
+        text = file_content.decode("latin-1")  # latin-1 никогда не падает
+    data = json.loads(text)
     # Гарантируем наличие корневых ключей
     data.setdefault("Events", [])
     data.setdefault("IsFallbackConfig", False)
