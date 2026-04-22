@@ -1,4 +1,5 @@
 import streamlit as st
+import copy
 from typing import Optional, List, Dict, Any, Union
 from models.event import PossibleNodeEventData, Segment, Stage
 from models.nodes import Node, ProgressNode, EntriesNode, DummyNode, node_from_dict
@@ -15,6 +16,7 @@ class AppState:
         self.current_segment_name = ""
         self.editing_context = None   # будет хранить копии редактируемых объектов
         self.temp_data = {}
+        self._event_cache: Dict[int, PossibleNodeEventData] = {}  # кэш десериализованных событий
 
     @classmethod
     def get_instance(cls):
@@ -29,6 +31,7 @@ class AppState:
 
     def set_cfg(self, cfg: dict) -> None:
         self.cfg = cfg
+        self._event_cache.clear()  # сбрасываем кэш при загрузке нового конфига
 
     def get_events_raw(self) -> List[dict]:
         return self.cfg.get("Events", [])
@@ -36,21 +39,39 @@ class AppState:
     def get_event_by_index(self, idx: int) -> Optional[PossibleNodeEventData]:
         events = self.get_events_raw()
         if 0 <= idx < len(events):
-            return PossibleNodeEventData.from_dict(events[idx])
+            if idx not in self._event_cache:
+                self._event_cache[idx] = PossibleNodeEventData.from_dict(events[idx])
+            return self._event_cache[idx]
         return None
+
+    def _invalidate_event_cache(self, idx: int) -> None:
+        """Инвалидирует кэш для конкретного события."""
+        self._event_cache.pop(idx, None)
 
     def update_event(self, idx: int, event: PossibleNodeEventData) -> None:
         if 0 <= idx < len(self.cfg["Events"]):
             self.cfg["Events"][idx] = event.to_dict()
+            self._invalidate_event_cache(idx)  # сбрасываем кэш после обновления
 
     def add_event(self, event: PossibleNodeEventData) -> None:
         self.cfg["Events"].append(event.to_dict())
         self.current_event_idx = len(self.cfg["Events"]) - 1
         self.current_segment_name = ""
+        # кэш для нового индекса не нужен — он будет создан при первом обращении
 
     def delete_event(self, idx: int) -> None:
         if 0 <= idx < len(self.cfg["Events"]):
             del self.cfg["Events"][idx]
+            # Перестраиваем кэш: сдвигаем индексы после удалённого
+            new_cache: Dict[int, PossibleNodeEventData] = {}
+            for k, v in self._event_cache.items():
+                if k < idx:
+                    new_cache[k] = v
+                elif k > idx:
+                    new_cache[k - 1] = v
+                # k == idx — удаляем из кэша
+            self._event_cache = new_cache
+
             if self.current_event_idx == idx:
                 self.current_event_idx = -1
                 self.current_segment_name = ""
@@ -161,27 +182,30 @@ class AppState:
     def start_editing_event(self, idx: int) -> None:
         event = self.get_event_by_index(idx)
         if event:
-            event_copy = PossibleNodeEventData.from_dict(event.to_dict())
+            raw = self.cfg["Events"][idx]
+            event_copy = PossibleNodeEventData.from_dict(copy.deepcopy(raw))
             self.editing_context = {"type": "event", "index": idx, "copy": event_copy}
 
     def start_editing_segment(self, event_idx: int, seg_name: str) -> None:
-        event = self.get_event_by_index(event_idx)
-        if event and seg_name in event.segments:
-            seg_copy = Segment.from_dict(seg_name, event.segments[seg_name].to_dict())
-            self.editing_context = {
-                "type": "segment",
-                "event_idx": event_idx,
-                "name": seg_name,
-                "copy": seg_copy
-            }
+        events = self.get_events_raw()
+        if 0 <= event_idx < len(events):
+            seg_raw = events[event_idx].get("PossibleNodeEventData", {}).get("Segments", {}).get(seg_name)
+            if seg_raw is not None:
+                seg_copy = Segment.from_dict(seg_name, {seg_name: copy.deepcopy(seg_raw)})
+                self.editing_context = {
+                    "type": "segment",
+                    "event_idx": event_idx,
+                    "name": seg_name,
+                    "copy": seg_copy
+                }
 
     def start_editing_node(self, event_idx: int, seg_name: str, stage_idx: int, node_idx: int) -> None:
-        event = self.get_event_by_index(event_idx)
-        if event and seg_name in event.segments:
-            segment = event.segments[seg_name]
-            if 0 <= stage_idx < len(segment.stages) and 0 <= node_idx < len(segment.stages[stage_idx].nodes):
-                node = segment.stages[stage_idx].nodes[node_idx]
-                node_copy = node_from_dict(node.to_dict())
+        events = self.get_events_raw()
+        if 0 <= event_idx < len(events):
+            try:
+                node_raw = (events[event_idx]["PossibleNodeEventData"]["Segments"]
+                            [seg_name]["Stages"][stage_idx]["Nodes"][node_idx])
+                node_copy = node_from_dict(copy.deepcopy(node_raw))
                 self.editing_context = {
                     "type": "node",
                     "event_idx": event_idx,
@@ -190,6 +214,8 @@ class AppState:
                     "node_idx": node_idx,
                     "copy": node_copy
                 }
+            except (KeyError, IndexError):
+                pass
 
     def clear_editing(self) -> None:
         self.editing_context = None

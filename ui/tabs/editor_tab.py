@@ -10,14 +10,16 @@ from utils.constants import DEFAULT_VIP_RANGE
 def render_editor_tab():
     app_state = AppState.get_instance()
 
-    # Статусная строка
+    # Статусная строка — читаем только сырые данные, без десериализации
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.info(f"📊 Всего событий: {len(app_state.get_events_raw())}")
+        events_raw = app_state.get_events_raw()
+        st.info(f"📊 Всего событий: {len(events_raw)}")
     with col2:
-        cur_event = app_state.get_current_event()
-        if cur_event:
-            st.info(f"✏️ Текущее: {cur_event.event_id}")
+        cur_idx = app_state.get_current_event_idx()
+        if cur_idx >= 0 and cur_idx < len(events_raw):
+            cur_event_id = events_raw[cur_idx].get("PossibleNodeEventData", {}).get("EventID", "?")
+            st.info(f"✏️ Текущее: {cur_event_id}")
         else:
             st.info("✏️ Нет текущего события")
     with col3:

@@ -11,9 +11,11 @@ def render_validation_tab():
         uploaded = st.file_uploader("Загрузить JSON", type=["json"])
         if uploaded:
             try:
-                cfg = load_config_from_json(uploaded.read())
-                app_state.set_cfg(cfg)
-                st.success("JSON загружен")
+                with st.spinner("Загрузка JSON..."):
+                    cfg = load_config_from_json(uploaded.read())
+                    app_state.set_cfg(cfg)
+                n_events = len(cfg.get("Events", []))
+                st.success(f"JSON загружен ({n_events} событий)")
             except Exception as e:
                 st.error(f"Ошибка: {e}")
 

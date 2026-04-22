@@ -7,6 +7,7 @@ def load_config_from_json(file_content: bytes) -> dict:
     Загружает конфиг из байтового содержимого JSON-файла.
     Выполняет минимальную инициализацию обязательных полей.
     """
+    # json.loads быстрее чем любые обёртки — используем напрямую
     data = json.loads(file_content.decode("utf-8"))
     # Гарантируем наличие корневых ключей
     data.setdefault("Events", [])
@@ -16,6 +17,10 @@ def load_config_from_json(file_content: bytes) -> dict:
 def save_config_to_json(cfg: dict) -> bytes:
     """Преобразует конфиг в красиво отформатированный JSON (байты)."""
     return json.dumps(cfg, ensure_ascii=False, indent=4).encode("utf-8")
+
+def save_config_to_json_compact(cfg: dict) -> bytes:
+    """Компактный JSON без отступов — быстрее для больших конфигов."""
+    return json.dumps(cfg, ensure_ascii=False, separators=(',', ':')).encode("utf-8")
 
 def validate_config(cfg: dict, schema: Optional[dict]) -> Tuple[bool, str]:
     """
