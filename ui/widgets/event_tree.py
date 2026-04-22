@@ -7,6 +7,14 @@ MAX_EVENTS_VISIBLE = 20  # пагинация событий
 
 def render_event_tree():
     app_state = AppState.get_instance()
+
+    # Обработка отложенного открытия ноды (после clear_editing + rerun)
+    pending = st.session_state.pop("_pending_edit_node", None)
+    if pending is not None:
+        idx, seg_name, stage_idx, node_idx = pending
+        app_state.start_editing_node(idx, seg_name, stage_idx, node_idx)
+        st.rerun()
+
     events_raw = app_state.get_events_raw()
     if not events_raw:
         st.info("📭 Нет сохранённых событий")
@@ -111,7 +119,13 @@ def render_event_tree():
                             st.write(f"         🔹 {node_type} (ID: {node_id}, Next: {next_ids})")
                         with n_cols[1]:
                             if st.button("✏️", key=f"tree_edit_node_{idx}_{seg_name}_{stage_idx}_{node_idx}"):
-                                app_state.start_editing_node(idx, seg_name, stage_idx, node_idx)
+                                # Если уже редактируем ноду — сначала сбрасываем, потом открываем новую
+                                if app_state.is_editing("node"):
+                                    app_state.clear_editing()
+                                    # Сохраняем координаты следующей ноды для открытия после rerun
+                                    st.session_state["_pending_edit_node"] = (idx, seg_name, stage_idx, node_idx)
+                                else:
+                                    app_state.start_editing_node(idx, seg_name, stage_idx, node_idx)
                                 st.rerun()
                         with n_cols[2]:
                             if st.button("❌", key=f"tree_del_node_{idx}_{seg_name}_{stage_idx}_{node_idx}"):

@@ -185,6 +185,7 @@ class AppState:
             raw = self.cfg["Events"][idx]
             event_copy = PossibleNodeEventData.from_dict(copy.deepcopy(raw))
             self.editing_context = {"type": "event", "index": idx, "copy": event_copy}
+            self.current_event_idx = idx
 
     def start_editing_segment(self, event_idx: int, seg_name: str) -> None:
         events = self.get_events_raw()
@@ -198,6 +199,9 @@ class AppState:
                     "name": seg_name,
                     "copy": seg_copy
                 }
+                # Устанавливаем текущее событие и сегмент
+                self.current_event_idx = event_idx
+                self.current_segment_name = seg_name
 
     def start_editing_node(self, event_idx: int, seg_name: str, stage_idx: int, node_idx: int) -> None:
         events = self.get_events_raw()
@@ -214,11 +218,18 @@ class AppState:
                     "node_idx": node_idx,
                     "copy": node_copy
                 }
+                # Устанавливаем текущее событие и сегмент чтобы ШАГ 3 стал видимым
+                self.current_event_idx = event_idx
+                self.current_segment_name = seg_name
             except (KeyError, IndexError):
                 pass
 
     def clear_editing(self) -> None:
         self.editing_context = None
+        # Сбрасываем идентификаторы загруженных нод чтобы форма перезагрузилась
+        for key in list(st.session_state.keys()):
+            if key.startswith("_node_loaded_id_") or key.startswith("_node_snapshot_"):
+                del st.session_state[key]
 
     def get_editing_context(self) -> Optional[Dict[str, Any]]:
         return self.editing_context

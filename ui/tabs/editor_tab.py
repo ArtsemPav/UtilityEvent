@@ -309,7 +309,11 @@ def render_editor_tab():
         ctx = app_state.get_editing_context()
         editing_node = (ctx is not None and ctx["type"] == "node")
         current_segment = app_state.get_current_segment()
-        if current_event and current_segment:
+
+        # Показываем ШАГ 3 если: редактируем ноду (из дерева) ИЛИ выбран сегмент
+        show_step3 = editing_node or (current_event is not None and current_segment is not None)
+
+        if show_step3:
             with st.expander("🔧 ШАГ 3: Создание / редактирование ноды", expanded=editing_node):
                 if editing_node:
                     _, _, _, _, node_obj = app_state.get_editing_node_copy()
