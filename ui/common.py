@@ -1,5 +1,32 @@
 import streamlit as st
 
+def inject_sticky_right_column() -> None:
+    """
+    Делает правую колонку основного layout sticky —
+    она остаётся на экране при скролле левой колонки.
+    Работает для layout с двумя колонками (левая — список, правая — редактор).
+    """
+    st.markdown(
+        """
+        <style>
+        /* Находим блок с двумя колонками и фиксируем правую */
+        [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:last-child {
+            position: sticky;
+            top: 3.5rem;
+            max-height: calc(100vh - 4rem);
+            overflow-y: auto;
+            align-self: flex-start;
+        }
+        /* Убираем лишний скроллбар у родителя */
+        [data-testid="stHorizontalBlock"] {
+            align-items: flex-start;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def confirm_button(label: str, key: str, message: str = "Вы уверены?") -> bool:
     """
     Кнопка с подтверждением через встроенный диалог.

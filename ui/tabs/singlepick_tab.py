@@ -472,10 +472,14 @@ def _render_wedge_form(state: SinglePickState, wheel: WheelConfig, i: int, wedge
     )
 
 
+from ui.common import inject_sticky_right_column
+
+
 # ── Точка входа ───────────────────────────────────────────────────────────────
 
 def render_singlepick_tab() -> None:
     state = get_singlepick_state()
+    inject_sticky_right_column()
 
     _render_toolbar(state)
 

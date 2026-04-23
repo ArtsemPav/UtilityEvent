@@ -18,9 +18,11 @@ from ui.import_tab import render_batch_import_panel
 from services.json_io import load_config_from_json
 from utils.helpers import parse_comma_separated_list
 from utils.constants import DEFAULT_VIP_RANGE
+from ui.common import inject_sticky_right_column
 
 def render_editor_tab():
     app_state = AppState.get_instance()
+    inject_sticky_right_column()
 
     # Загрузка JSON + счётчик событий
     col_new, col_upload, col_count = st.columns([1, 3, 1])
