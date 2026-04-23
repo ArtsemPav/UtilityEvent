@@ -26,14 +26,38 @@ def render_editor_tab():
     col_new, col_upload, col_count = st.columns([1, 3, 1])
     with col_new:
         if st.button("🆕 Новый конфиг", use_container_width=True):
-            app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
-            app_state.set_current_event_idx(-1)
-            app_state.clear_editing()
-            st.session_state["creating_event"] = False
-            st.session_state["creating_segment"] = False
-            st.session_state["creating_node"] = False
-            st.session_state["batch_import_event_idx"] = -1
-            st.rerun()
+            events_raw = app_state.get_events_raw()
+            if len(events_raw) == 0:
+                app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
+                app_state.set_current_event_idx(-1)
+                app_state.clear_editing()
+                st.session_state["creating_event"] = False
+                st.session_state["creating_segment"] = False
+                st.session_state["creating_node"] = False
+                st.session_state["batch_import_event_idx"] = -1
+                st.rerun()
+            else:
+                st.session_state["editor_confirm_reset"] = True
+                st.rerun()
+
+    if st.session_state.get("editor_confirm_reset"):
+        st.warning("Сбросить конфиг? Все данные будут потеряны.")
+        col_yes, col_no = st.columns(2)
+        with col_yes:
+            if st.button("✅ Да", key="editor_reset_yes"):
+                app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
+                app_state.set_current_event_idx(-1)
+                app_state.clear_editing()
+                st.session_state["creating_event"] = False
+                st.session_state["creating_segment"] = False
+                st.session_state["creating_node"] = False
+                st.session_state["batch_import_event_idx"] = -1
+                del st.session_state["editor_confirm_reset"]
+                st.rerun()
+        with col_no:
+            if st.button("❌ Нет", key="editor_reset_no"):
+                del st.session_state["editor_confirm_reset"]
+                st.rerun()
     with col_upload:
         uploaded = st.file_uploader("📂 Загрузить JSON", type=["json"], key="editor_json_uploader", label_visibility="collapsed")
         if uploaded:
