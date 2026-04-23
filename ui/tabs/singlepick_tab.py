@@ -1,3 +1,4 @@
+import copy
 import json
 import streamlit as st
 from dataclasses import dataclass, field
@@ -148,10 +149,25 @@ def _render_tree(state: SinglePickState) -> None:
 
         with st.expander(f"{icon} {cs_name}  `{cs_type}`", expanded=True):
             # Кнопки управления ConfigSet
-            col_cfg, col_del = st.columns([3, 1])
+            col_cfg, col_dup, col_del = st.columns([3, 1, 1])
             with col_cfg:
                 if st.button("⚙️ Настройки", key=f"sp_cs_settings_{cs_name}", use_container_width=True):
                     state.editing = (cs_name, "", -1)
+                    st.rerun()
+            with col_dup:
+                if st.button("📋", key=f"sp_cs_dup_{cs_name}", use_container_width=True, help="Дублировать ConfigSet"):
+                    existing = list(state.config.config_sets.keys())
+                    candidate = f"{cs_name}_copy"
+                    counter = 2
+                    while candidate in existing:
+                        candidate = f"{cs_name}_copy{counter}"
+                        counter += 1
+                    new_cs = copy.deepcopy(cs)
+                    # Вставляем сразу после оригинала
+                    items = list(state.config.config_sets.items())
+                    insert_at = next(i for i, (k, _) in enumerate(items) if k == cs_name) + 1
+                    items.insert(insert_at, (candidate, new_cs))
+                    state.config.config_sets = dict(items)
                     st.rerun()
             with col_del:
                 if st.button("❌", key=f"sp_cs_del_{cs_name}", use_container_width=True):
@@ -182,12 +198,17 @@ def _render_tree(state: SinglePickState) -> None:
                 for i, pick in enumerate(pickers.picks):
                     pick_type = type(pick).__name__
                     label = f"🔹 {i+1}. {pick_type}  W:{pick.weight}  PM:{pick.possible_max}"
-                    col_lbl, col_edit, col_up, col_dn, col_del = st.columns([5, 1, 1, 1, 1])
+                    col_lbl, col_edit, col_dup, col_up, col_dn, col_del = st.columns([5, 1, 1, 1, 1, 1])
                     with col_lbl:
                         st.write(label)
                     with col_edit:
                         if st.button("✏️", key=f"sp_{cs_name}_pick_{i}_edit"):
                             state.editing = (cs_name, "pick", i)
+                            st.rerun()
+                    with col_dup:
+                        if st.button("📋", key=f"sp_{cs_name}_pick_{i}_dup", help="Дублировать пик"):
+                            new_pick = copy.deepcopy(pick)
+                            pickers.picks.insert(i + 1, new_pick)
                             st.rerun()
                     with col_up:
                         if i > 0 and st.button("↑", key=f"sp_{cs_name}_pick_{i}_up"):
@@ -227,12 +248,17 @@ def _render_tree(state: SinglePickState) -> None:
                 wheel = cs.content
                 for i, wedge in enumerate(wheel.wedges):
                     label = f"🔸 {i+1}. Wedge  W:{wedge.weight}  Наград:{len(wedge.reward)}"
-                    col_lbl, col_edit, col_del = st.columns([6, 1, 1])
+                    col_lbl, col_edit, col_dup, col_del = st.columns([6, 1, 1, 1])
                     with col_lbl:
                         st.write(label)
                     with col_edit:
                         if st.button("✏️", key=f"sp_{cs_name}_wedge_{i}_edit"):
                             state.editing = (cs_name, "wedge", i)
+                            st.rerun()
+                    with col_dup:
+                        if st.button("📋", key=f"sp_{cs_name}_wedge_{i}_dup", help="Дублировать сектор"):
+                            new_wedge = copy.deepcopy(wedge)
+                            wheel.wedges.insert(i + 1, new_wedge)
                             st.rerun()
                     with col_del:
                         if st.button("❌", key=f"sp_{cs_name}_wedge_{i}_del"):

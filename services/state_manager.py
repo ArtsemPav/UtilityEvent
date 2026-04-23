@@ -178,6 +178,66 @@ class AppState:
             del segment.stages[stage_idx].nodes[node_idx]
             self.update_event(event_idx, event)
 
+    # --- Дублирование ---
+    def duplicate_event(self, idx: int) -> None:
+        """Создаёт копию события с суффиксом _copy (или _copy2, _copy3, ...) к EventID."""
+        events = self.get_events_raw()
+        if not (0 <= idx < len(events)):
+            return
+        new_raw = copy.deepcopy(events[idx])
+        base_id = new_raw["PossibleNodeEventData"]["EventID"]
+        # Генерируем уникальный EventID
+        existing_ids = {e["PossibleNodeEventData"]["EventID"] for e in events}
+        candidate = f"{base_id}_copy"
+        counter = 2
+        while candidate in existing_ids:
+            candidate = f"{base_id}_copy{counter}"
+            counter += 1
+        new_raw["PossibleNodeEventData"]["EventID"] = candidate
+        new_event = PossibleNodeEventData.from_dict(new_raw)
+        self.cfg["Events"].insert(idx + 1, new_event.to_dict())
+        # Сдвигаем кэш для индексов > idx
+        new_cache: Dict[int, PossibleNodeEventData] = {}
+        for k, v in self._event_cache.items():
+            if k <= idx:
+                new_cache[k] = v
+            else:
+                new_cache[k + 1] = v
+        self._event_cache = new_cache
+        if self.current_event_idx > idx:
+            self.current_event_idx += 1
+
+    def duplicate_segment(self, event_idx: int, seg_name: str) -> None:
+        """Создаёт копию сегмента с суффиксом _copy (или _copy2, ...) к имени."""
+        event = self.get_event_by_index(event_idx)
+        if event is None or seg_name not in event.segments:
+            return
+        existing_names = set(event.segments.keys())
+        candidate = f"{seg_name}_copy"
+        counter = 2
+        while candidate in existing_names:
+            candidate = f"{seg_name}_copy{counter}"
+            counter += 1
+        new_seg = copy.deepcopy(event.segments[seg_name])
+        new_seg.name = candidate
+        event.segments[candidate] = new_seg
+        self.update_event(event_idx, event)
+
+    def duplicate_node(self, event_idx: int, seg_name: str, stage_idx: int, node_idx: int) -> None:
+        """Вставляет копию ноды сразу после оригинала."""
+        event = self.get_event_by_index(event_idx)
+        if event is None or seg_name not in event.segments:
+            return
+        segment = event.segments[seg_name]
+        if not (0 <= stage_idx < len(segment.stages)):
+            return
+        nodes = segment.stages[stage_idx].nodes
+        if not (0 <= node_idx < len(nodes)):
+            return
+        new_node = node_from_dict(copy.deepcopy(nodes[node_idx].to_dict()))
+        nodes.insert(node_idx + 1, new_node)
+        self.update_event(event_idx, event)
+
     # --- Контекст редактирования (храним копии объектов) ---
     def start_editing_event(self, idx: int) -> None:
         event = self.get_event_by_index(idx)
