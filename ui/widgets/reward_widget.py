@@ -6,6 +6,7 @@ from models.rewards import (
     RtpReward,
     FreeplayUnlockReward,
     CollectableSellPacksReward,
+    CollectableMagicPacksReward,
 )
 from utils.constants import REWARD_TYPES
 
@@ -34,6 +35,8 @@ def render_reward_widget(prefix: str, index: int, existing: Optional[Reward] = N
             current_type = "FreePlays"
         elif isinstance(data, CollectableSellPacksReward):
             current_type = "Packs"
+        elif isinstance(data, CollectableMagicPacksReward):
+            current_type = "MagicPacks"
 
     col1, col2 = st.columns([1, 3])
     with col1:
@@ -122,6 +125,23 @@ def render_reward_widget(prefix: str, index: int, existing: Optional[Reward] = N
                     key=f"{prefix}_reward_{index}_numpacks"
                 )
             return Reward(data=CollectableSellPacksReward(pack_id=pack, num_packs=int(num)))
+
+        elif reward_type == "MagicPacks":
+            c1, c2 = st.columns(2)
+            with c1:
+                pack = st.text_input(
+                    "Pack ID",
+                    value=existing.data.pack_id if existing and isinstance(existing.data, CollectableMagicPacksReward) else "magicPack50",
+                    key=f"{prefix}_reward_{index}_magicpackid"
+                )
+            with c2:
+                num = st.number_input(
+                    "Number of Packs",
+                    value=existing.data.num_packs if existing and isinstance(existing.data, CollectableMagicPacksReward) else 1,
+                    min_value=1, max_value=5, step=1,
+                    key=f"{prefix}_reward_{index}_magicnumpacks"
+                )
+            return Reward(data=CollectableMagicPacksReward(pack_id=pack, num_packs=int(num)))
 
         elif reward_type in ["BoardGameDices", "BoardGameBuilds", "BoardGameRareBuilds"]:
             curr = reward_type

@@ -39,6 +39,7 @@ REWARD_TYPES = [
     "Sweepstakes",
     "FreePlays",
     "Packs",
+    "MagicPacks",
     "BoardGameDices",
     "BoardGameBuilds",
     "BoardGameRareBuilds",

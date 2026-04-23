@@ -43,14 +43,18 @@ class RtpSPReward(Serializable):
 @dataclass
 class PurchaseSPReward(Serializable):
     shop_type: str
+    shop_name: str
 
     def to_dict(self) -> dict:
-        return {"PurchaseReward": {"ShopType": self.shop_type}}
+        return {"PurchaseReward": {"ShopType": self.shop_type, "ShopName": self.shop_name}}
 
     @classmethod
     def from_dict(cls, data: dict):
         inner = data.get("PurchaseReward", {})
-        return cls(shop_type=inner.get("ShopType", ""))
+        return cls(
+            shop_type=inner.get("ShopType", ""),
+            shop_name=inner.get("ShopName", ""),
+        )
 
 
 @dataclass

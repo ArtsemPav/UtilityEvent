@@ -160,9 +160,17 @@ def render_sp_reward_widget(
 
     # ── PurchaseReward ────────────────────────────────────────────────────
     else:
-        shop_type = st.text_input(
-            "ShopType",
-            value=existing.shop_type if isinstance(existing, PurchaseSPReward) else "",
-            key=f"{prefix}_{index}_shop_type",
-        )
-        return PurchaseSPReward(shop_type=shop_type)
+        c1, c2 = st.columns(2)
+        with c1:
+            shop_type = st.text_input(
+                "ShopType",
+                value=existing.shop_type if isinstance(existing, PurchaseSPReward) else "",
+                key=f"{prefix}_{index}_shop_type",
+            )
+        with c2:
+            shop_name = st.text_input(
+                "ShopName",
+                value=existing.shop_name if isinstance(existing, PurchaseSPReward) else "",
+                key=f"{prefix}_{index}_shop_name",
+            )
+        return PurchaseSPReward(shop_type=shop_type, shop_name=shop_name)

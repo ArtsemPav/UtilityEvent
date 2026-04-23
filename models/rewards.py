@@ -62,8 +62,21 @@ class CollectableSellPacksReward(Serializable):
         inner = data.get("CollectableSellPacksReward", {})
         return cls(pack_id=inner.get("PackId", "sellPack50"), num_packs=inner.get("NumPacks", 4))
 
+@dataclass
+class CollectableMagicPacksReward(Serializable):
+    pack_id: str
+    num_packs: int
+
+    def to_dict(self) -> dict:
+        return {"CollectableMagicPacksReward": {"PackId": self.pack_id, "NumPacks": self.num_packs}}
+
+    @classmethod
+    def from_dict(cls, data: dict):
+        inner = data.get("CollectableMagicPacksReward", {})
+        return cls(pack_id=inner.get("PackId", "magicPack50"), num_packs=inner.get("NumPacks", 1))
+
 # ---------- Обёртка Reward ----------
-RewardType = Union[FixedReward, RtpReward, FreeplayUnlockReward, CollectableSellPacksReward]
+RewardType = Union[FixedReward, RtpReward, FreeplayUnlockReward, CollectableSellPacksReward, CollectableMagicPacksReward]
 
 @dataclass
 class Reward(Serializable):
@@ -83,6 +96,8 @@ class Reward(Serializable):
             inner = FreeplayUnlockReward.from_dict(data)
         elif "CollectableSellPacksReward" in data:
             inner = CollectableSellPacksReward.from_dict(data)
+        elif "CollectableMagicPacksReward" in data:
+            inner = CollectableMagicPacksReward.from_dict(data)
         else:
             # fallback
             inner = FixedReward(currency="Chips", amount=0.0)
