@@ -7,7 +7,7 @@ from ui.widgets.event_tree import render_event_tree
 from ui.import_tab import render_batch_import_panel
 from services.json_io import load_config_from_json
 from utils.helpers import parse_comma_separated_list
-from utils.constants import DEFAULT_VIP_RANGE
+from utils.constants import DEFAULT_VIP_RANGE, SEGMENT_INFO_TYPES, SEGMENT_INFO_NONE
 from ui.common import inject_sticky_right_column
 
 def render_editor_tab():
@@ -293,27 +293,6 @@ def render_editor_tab():
             editing_segment = (ctx is not None and ctx["type"] == "segment")
             current_event = app_state.get_current_event()
 
-            def has_segment_type_conflict(event: PossibleNodeEventData, new_vip_range: str, old_name: str = None) -> tuple[bool, str]:
-                vip_count = 0
-                non_vip_count = 0
-                for name, seg in event.segments.items():
-                    if name == old_name:
-                        continue
-                    if seg.vip_range == "":
-                        non_vip_count += 1
-                    else:
-                        vip_count += 1
-                is_new_non_vip = (new_vip_range == "")
-                if is_new_non_vip:
-                    if vip_count > 0:
-                        return True, "❌ Нельзя добавить сегмент без VIP, когда уже есть VIP-сегменты."
-                    if non_vip_count >= 1:
-                        return True, "❌ В событии уже есть сегмент без VIP. Можно иметь только один такой сегмент."
-                else:
-                    if non_vip_count > 0:
-                        return True, "❌ Нельзя добавить VIP-сегмент, когда уже есть сегмент без VIP."
-                return False, ""
-
             if current_event:
                 show_step2 = editing_segment or creating_segment
                 if show_step2:
@@ -321,78 +300,93 @@ def render_editor_tab():
                         if editing_segment:
                             event_idx, old_name, seg_obj = app_state.get_editing_segment_copy()
                             st.write(f"✏️ Редактирование сегмента: {seg_obj.name}")
-                            if seg_obj.vip_range:
-                                default_segment_type = "Стандартный (с VIP)"
-                            else:
-                                default_segment_type = "RandomSegmentName (без VIP)"
+                            default_info_type = seg_obj.segment_info_type or SEGMENT_INFO_NONE
                         else:
                             seg_obj = None
-                            default_segment_type = "Стандартный (с VIP)"
+                            old_name = None
+                            default_info_type = "VIPRange"
 
-                        segment_type_key = "segment_type_selector"
-                        if segment_type_key not in st.session_state:
-                            st.session_state[segment_type_key] = default_segment_type
+                        # Список вариантов для selectbox: типы + "без инфо"
+                        info_type_options = list(SEGMENT_INFO_TYPES.keys()) + [SEGMENT_INFO_NONE]
+                        info_type_labels = [SEGMENT_INFO_TYPES[k] for k in SEGMENT_INFO_TYPES] + ["Без PossibleSegmentInfo"]
 
-                        segment_type = st.radio(
-                            "Тип сегмента",
-                            options=["Стандартный (с VIP)", "RandomSegmentName (без VIP)"],
+                        seg_info_type_key = "segment_info_type_selector"
+                        if seg_info_type_key not in st.session_state:
+                            st.session_state[seg_info_type_key] = (
+                                default_info_type if default_info_type in info_type_options else "VIPRange"
+                            )
+
+                        selected_idx = info_type_options.index(st.session_state[seg_info_type_key]) \
+                            if st.session_state[seg_info_type_key] in info_type_options else 0
+
+                        chosen_label = st.radio(
+                            "Тип PossibleSegmentInfo",
+                            options=info_type_labels,
+                            index=selected_idx,
                             horizontal=True,
-                            key=segment_type_key
+                            key=seg_info_type_key + "_radio",
                         )
+                        chosen_type = info_type_options[info_type_labels.index(chosen_label)]
+                        st.session_state[seg_info_type_key] = chosen_type
 
                         with st.form(key="segment_form"):
-                            if segment_type == "Стандартный (с VIP)":
-                                col_a, col_b = st.columns(2)
-                                with col_a:
-                                    seg_name = st.text_input(
-                                        "Имя сегмента",
-                                        value=seg_obj.name if seg_obj else "VIP1_10"
+                            col_a, col_b = st.columns(2)
+                            with col_a:
+                                seg_name = st.text_input(
+                                    "Имя сегмента",
+                                    value=seg_obj.name if seg_obj else (
+                                        "RandomSegmentName" if chosen_type == SEGMENT_INFO_NONE else "VIP1_10"
                                     )
-                                with col_b:
-                                    vip_range = st.text_input(
-                                        "VIP Range",
-                                        value=seg_obj.vip_range if seg_obj and seg_obj.vip_range else DEFAULT_VIP_RANGE
+                                )
+                            with col_b:
+                                if chosen_type != SEGMENT_INFO_NONE:
+                                    # Подставляем текущее значение если тип совпадает, иначе дефолт
+                                    if seg_obj and seg_obj.segment_info_type == chosen_type:
+                                        default_val = seg_obj.segment_info_value
+                                    elif chosen_type == "VIPRange":
+                                        default_val = DEFAULT_VIP_RANGE
+                                    else:
+                                        default_val = ""
+                                    seg_info_value = st.text_input(
+                                        SEGMENT_INFO_TYPES[chosen_type],
+                                        value=default_val,
+                                        placeholder="например: 1-10+" if chosen_type == "VIPRange" else "например: 100-500"
                                     )
-                            else:
-                                col_a, _ = st.columns(2)
-                                with col_a:
-                                    seg_name = st.text_input(
-                                        "Имя сегмента",
-                                        value=seg_obj.name if seg_obj else "RandomSegmentName"
-                                    )
-                                vip_range = ""
+                                else:
+                                    seg_info_value = ""
+                                    st.caption("PossibleSegmentInfo не будет добавлен в JSON")
 
                             submitted = st.form_submit_button(
                                 "💾 Сохранить сегмент" if editing_segment else "➕ Добавить сегмент"
                             )
                             if submitted:
-                                conflict, msg = has_segment_type_conflict(
-                                    current_event, vip_range,
-                                    old_name if editing_segment else None
-                                )
-                                if conflict:
-                                    st.error(msg)
+                                if not seg_name.strip():
+                                    st.error("❌ Имя сегмента не может быть пустым.")
+                                elif chosen_type != SEGMENT_INFO_NONE and not seg_info_value.strip():
+                                    st.error(f"❌ Укажите значение для {SEGMENT_INFO_TYPES[chosen_type]}.")
                                 else:
-                                    if segment_type == "Стандартный (с VIP)":
-                                        new_seg = Segment(name=seg_name, vip_range=vip_range)
-                                    else:
-                                        new_seg = Segment(name=seg_name, vip_range="")
+                                    new_seg = Segment(
+                                        name=seg_name.strip(),
+                                        segment_info_type=chosen_type,
+                                        segment_info_value=seg_info_value.strip(),
+                                    )
                                     if editing_segment:
-                                        seg_obj.name = seg_name
-                                        seg_obj.vip_range = vip_range if segment_type == "Стандартный (с VIP)" else ""
+                                        seg_obj.name = new_seg.name
+                                        seg_obj.segment_info_type = new_seg.segment_info_type
+                                        seg_obj.segment_info_value = new_seg.segment_info_value
                                         app_state.apply_editing()
                                         st.success("✅ Сегмент обновлён")
                                     else:
                                         app_state.add_segment(app_state.get_current_event_idx(), new_seg)
                                         st.success("✅ Сегмент добавлен")
-                                    if segment_type_key in st.session_state:
-                                        del st.session_state[segment_type_key]
+                                    st.session_state.pop(seg_info_type_key, None)
+                                    st.session_state.pop(seg_info_type_key + "_radio", None)
                                     st.session_state["creating_segment"] = False
                                     st.rerun()
 
                         if st.button("❌ Отменить", key="cancel_segment"):
-                            if segment_type_key in st.session_state:
-                                del st.session_state[segment_type_key]
+                            st.session_state.pop(seg_info_type_key, None)
+                            st.session_state.pop(seg_info_type_key + "_radio", None)
                             app_state.clear_editing()
                             st.session_state["creating_segment"] = False
                             st.rerun()

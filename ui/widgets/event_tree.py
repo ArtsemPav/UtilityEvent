@@ -91,10 +91,16 @@ def render_event_tree():
                 continue
 
             for seg_name, seg_data in segments.items():
-                vip_info = seg_data.get("PossibleSegmentInfo", {})
-                vip_range = vip_info.get("VIPRange", "N/A") if vip_info else "N/A"
+                seg_info = seg_data.get("PossibleSegmentInfo", {})
+                # Определяем тип и значение
+                info_label = "N/A"
+                if seg_info:
+                    for key in ("VIPRange", "AverageWagerRange", "SpinpadRange", "LevelRange"):
+                        if key in seg_info:
+                            info_label = f"{key}: {seg_info[key]}"
+                            break
 
-                with st.expander(f"📁 Сегмент: {seg_name} (VIP: {vip_range})", expanded=False):
+                with st.expander(f"📁 Сегмент: {seg_name} ({info_label})", expanded=False):
                     cols = st.columns([3, 1, 1])
                     with cols[0]:
                         st.write(f"**{seg_name}**")

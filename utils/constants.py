@@ -13,6 +13,16 @@ DEFAULT_SEGMENT = "Default"
 # ---------- Значения по умолчанию для сегментов ----------
 DEFAULT_VIP_RANGE = "1-10+"
 
+# Типы PossibleSegmentInfo и их метки для UI
+SEGMENT_INFO_TYPES = {
+    "VIPRange":          "VIP Range",
+    "AverageWagerRange": "Average Wager Range",
+    "SpinpadRange":      "Spinpad Range",
+    "LevelRange":        "Level Range",
+}
+# Ключ для сегмента без PossibleSegmentInfo
+SEGMENT_INFO_NONE = ""
+
 # ---------- Значения по умолчанию для узлов ----------
 DEFAULT_GAME_LIST = ["AllGames"]
 DEFAULT_BUTTON_TEXT = "PLAY NOW!"

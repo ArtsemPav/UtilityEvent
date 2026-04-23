@@ -25,30 +25,42 @@ class Stage(Serializable):
 @dataclass
 class Segment(Serializable):
     name: str
-    vip_range: str = "1-10+"
+    # Тип PossibleSegmentInfo: "VIPRange" | "AverageWagerRange" | "SpinpadRange" | "LevelRange" | "" (нет инфо)
+    segment_info_type: str = "VIPRange"
+    segment_info_value: str = "1-10+"
     stages: List[Stage] = field(default_factory=lambda: [Stage(stage_id=1)])
 
+    # Обратная совместимость: старый код читал vip_range
+    @property
+    def vip_range(self) -> str:
+        """Возвращает значение если тип VIPRange, иначе пустую строку."""
+        return self.segment_info_value if self.segment_info_type == "VIPRange" else ""
+
     def to_dict(self) -> dict:
-        if self.vip_range:
-            return {
-                self.name: {
-                    "Stages": [s.to_dict() for s in self.stages],
-                    "PossibleSegmentInfo": {"VIPRange": self.vip_range}
-                }
-            }
-        else:
-            return {
-                self.name: {
-                    "Stages": [s.to_dict() for s in self.stages]
-                }
-            }
+        inner: dict = {"Stages": [s.to_dict() for s in self.stages]}
+        if self.segment_info_type and self.segment_info_value:
+            inner["PossibleSegmentInfo"] = {self.segment_info_type: self.segment_info_value}
+        return {self.name: inner}
 
     @classmethod
     def from_dict(cls, name: str, data: dict):
         inner = data.get(name, {})
         stages = [Stage.from_dict(s) for s in inner.get("Stages", [])]
-        vip = inner.get("PossibleSegmentInfo", {}).get("VIPRange", "1-10+")
-        return cls(name=name, vip_range=vip, stages=stages)
+        seg_info = inner.get("PossibleSegmentInfo", {})
+        # Определяем тип и значение из PossibleSegmentInfo
+        seg_info_type = ""
+        seg_info_value = ""
+        for key in ("VIPRange", "AverageWagerRange", "SpinpadRange", "LevelRange"):
+            if key in seg_info:
+                seg_info_type = key
+                seg_info_value = seg_info[key]
+                break
+        return cls(
+            name=name,
+            segment_info_type=seg_info_type,
+            segment_info_value=seg_info_value,
+            stages=stages,
+        )
 
 @dataclass
 class PossibleNodeEventData(Serializable):
