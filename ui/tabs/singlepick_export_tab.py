@@ -1,8 +1,42 @@
 import json
 import streamlit as st
+import streamlit.components.v1 as components
 
 from services.singlepick_validator import validate_singlepick
 from ui.tabs.singlepick_tab import get_singlepick_state
+
+
+def _copy_button(text: str) -> None:
+    """Рендерит кнопку 'Копировать в буфер' через JS."""
+    import hashlib
+    import base64
+    btn_id = "cpbtn_" + hashlib.md5(text[:64].encode()).hexdigest()[:8]
+    b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
+    components.html(
+        f"""
+        <button id="{btn_id}" style="
+            width:100%; padding:8px 16px; font-size:14px; cursor:pointer;
+            background:#262730; color:#fafafa; border:1px solid #555; border-radius:6px;
+        ">Copy to clipboard</button>
+        <script>
+        (function() {{
+            var btn = document.getElementById("{btn_id}");
+            var b64 = "{b64}";
+            var text = decodeURIComponent(escape(atob(b64)));
+            btn.addEventListener("click", function() {{
+                navigator.clipboard.writeText(text).then(function() {{
+                    btn.textContent = "Copied!";
+                    setTimeout(function() {{ btn.textContent = "Copy to clipboard"; }}, 2000);
+                }}).catch(function() {{
+                    btn.textContent = "Error";
+                    setTimeout(function() {{ btn.textContent = "Copy to clipboard"; }}, 2000);
+                }});
+            }});
+        }})();
+        </script>
+        """,
+        height=44,
+    )
 
 
 def render_singlepick_export_tab() -> None:
@@ -38,16 +72,23 @@ def render_singlepick_export_tab() -> None:
 
     json_str = json.dumps(state.config.to_dict(), ensure_ascii=False, indent=4)
 
-    # Кнопка скачивания
-    st.download_button(
-        "📥 Скачать SinglePickConfig.json",
-        data=json_str.encode("utf-8"),
-        file_name="SinglePickConfig.json",
-        mime="application/json",
-        disabled=has_errors,
-        use_container_width=True,
-        key="singlepick_export_download",
-    )
+    # Кнопки скачивания и копирования
+    col_dl, col_cp = st.columns(2)
+    with col_dl:
+        st.download_button(
+            "📥 Скачать SinglePickConfig.json",
+            data=json_str.encode("utf-8"),
+            file_name="SinglePickConfig.json",
+            mime="application/json",
+            disabled=has_errors,
+            use_container_width=True,
+            key="singlepick_export_download",
+        )
+    with col_cp:
+        if not has_errors:
+            _copy_button(json_str)
+        else:
+            st.button("📋 Копировать в буфер", disabled=True, use_container_width=True)
 
     st.divider()
 
@@ -87,11 +128,15 @@ def render_singlepick_export_tab() -> None:
         with st.expander("📄 JSON", expanded=True):
             st.code(preview_str, language="json")
 
-        st.download_button(
-            label=f"📥 Скачать {filename_hint}",
-            data=preview_str.encode("utf-8"),
-            file_name=filename_hint,
-            mime="application/json",
-            use_container_width=True,
-            key="singlepick_export_download_fragment",
-        )
+        col_dl2, col_cp2 = st.columns(2)
+        with col_dl2:
+            st.download_button(
+                label=f"📥 Скачать {filename_hint}",
+                data=preview_str.encode("utf-8"),
+                file_name=filename_hint,
+                mime="application/json",
+                use_container_width=True,
+                key="singlepick_export_download_fragment",
+            )
+        with col_cp2:
+            _copy_button(preview_str)
