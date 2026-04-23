@@ -80,6 +80,8 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
     snap = _get_snapshot(prefix)
     src: Optional[ProgressNode] = snap if isinstance(snap, ProgressNode) else existing
 
+    show_advanced = st.session_state.get("show_advanced", False)
+
     rewards_key = f"{prefix}_p_rewards"
     if rewards_key not in st.session_state:
         st.session_state[rewards_key] = list(src.rewards) if src and src.rewards else [get_default_reward()]
@@ -161,6 +163,26 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
         key=f"{prefix}_p_prizebox"
     )
 
+    # Расширенные параметры ProgressNode
+    if show_advanced:
+        with st.expander("⚙️ Расширенные параметры", expanded=False):
+            adv_col1, adv_col2 = st.columns(2)
+            with adv_col1:
+                resegment_flag = st.checkbox(
+                    "ResegmentFlag",
+                    value=src.resegment_flag if src else False,
+                    key=f"{prefix}_p_resegment"
+                )
+            with adv_col2:
+                contribution_level = st.text_input(
+                    "ContributionLevel",
+                    value=src.contribution_level if src else "Node",
+                    key=f"{prefix}_p_contrlevel"
+                )
+    else:
+        resegment_flag = src.resegment_flag if src else False
+        contribution_level = src.contribution_level if src else "Node"
+
     if st.button("💾 Сохранить Progress Node", key=f"{prefix}_save_progress", type="primary"):
         game_list = parse_comma_separated_list(games_str)
         next_ids = [int(x.strip()) for x in next_ids_str.split(",") if x.strip()]
@@ -185,6 +207,8 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
             possible_item_collect=possible_item.strip() or "Default",
             hide_loading_screen=hide_loading,
             prize_box_index=int(prize_box),
+            resegment_flag=resegment_flag,
+            contribution_level=contribution_level,
         )
     return None
 
@@ -195,6 +219,8 @@ def render_entries_node_form(prefix: str, existing: Optional[EntriesNode] = None
 
     snap = _get_snapshot(prefix)
     src: Optional[EntriesNode] = snap if isinstance(snap, EntriesNode) else existing
+
+    show_advanced = st.session_state.get("show_advanced", False)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -258,6 +284,17 @@ def render_entries_node_form(prefix: str, existing: Optional[EntriesNode] = None
         key=f"{prefix}_e_prizebox"
     )
 
+    # Расширенные параметры EntriesNode
+    if show_advanced:
+        with st.expander("⚙️ Расширенные параметры", expanded=False):
+            resegment_flag = st.checkbox(
+                "ResegmentFlag",
+                value=src.resegment_flag if src else False,
+                key=f"{prefix}_e_resegment"
+            )
+    else:
+        resegment_flag = src.resegment_flag if src else False
+
     if st.button("💾 Сохранить Entries Node", key=f"{prefix}_save_entries", type="primary"):
         game_list = parse_comma_separated_list(games_str)
         goal_types = parse_comma_separated_list(goal_type_str)
@@ -276,6 +313,7 @@ def render_entries_node_form(prefix: str, existing: Optional[EntriesNode] = None
             custom_texts=custom_texts,
             possible_item_collect=possible_item.strip() or "Default",
             prize_box_index=int(prize_box),
+            resegment_flag=resegment_flag,
         )
     return None
 
@@ -286,6 +324,8 @@ def render_dummy_node_form(prefix: str, existing: Optional[DummyNode] = None) ->
 
     snap = _get_snapshot(prefix)
     src: Optional[DummyNode] = snap if isinstance(snap, DummyNode) else existing
+
+    show_advanced = st.session_state.get("show_advanced", False)
 
     col1, col2 = st.columns(2)
     with col1:
@@ -314,6 +354,80 @@ def render_dummy_node_form(prefix: str, existing: Optional[DummyNode] = None) ->
         key=f"{prefix}_d_ctexts"
     )
 
+    # Расширенные параметры DummyNode
+    if show_advanced:
+        with st.expander("⚙️ Расширенные параметры", expanded=False):
+            adv_col1, adv_col2, adv_col3 = st.columns(3)
+            with adv_col1:
+                resegment_flag = st.checkbox(
+                    "ResegmentFlag",
+                    value=src.resegment_flag if src else False,
+                    key=f"{prefix}_d_resegment"
+                )
+                is_last = st.checkbox(
+                    "IsLastNode",
+                    value=src.is_last_node if src else False,
+                    key=f"{prefix}_d_islast"
+                )
+                is_choice = st.checkbox(
+                    "IsChoiceEvent",
+                    value=src.is_choice_event if src else True,
+                    key=f"{prefix}_d_ischoice"
+                )
+            with adv_col2:
+                hide_loading = st.checkbox(
+                    "HideLoadingScreenForReward",
+                    value=src.hide_loading_screen if src else False,
+                    key=f"{prefix}_d_hideload"
+                )
+                prize_box = st.number_input(
+                    "PrizeBoxIndex",
+                    value=src.prize_box_index if src else 0,
+                    step=1,
+                    key=f"{prefix}_d_prizebox"
+                )
+            with adv_col3:
+                mini_game = st.text_input(
+                    "MiniGame",
+                    value=src.mini_game if src else "FlatReward",
+                    key=f"{prefix}_d_minigame"
+                )
+                contribution_level = st.text_input(
+                    "ContributionLevel",
+                    value=src.contribution_level if src else "Node",
+                    key=f"{prefix}_d_contrlevel"
+                )
+            adv_col4, adv_col5, adv_col6 = st.columns(3)
+            with adv_col4:
+                btn_text = st.text_input(
+                    "ButtonActionText",
+                    value=src.button_action_text if src else "",
+                    key=f"{prefix}_d_btntext"
+                )
+            with adv_col5:
+                btn_type = st.text_input(
+                    "ButtonActionType",
+                    value=src.button_action_type if src else "",
+                    key=f"{prefix}_d_btntype"
+                )
+            with adv_col6:
+                btn_data = st.text_input(
+                    "ButtonActionData",
+                    value=src.button_action_data if src else "",
+                    key=f"{prefix}_d_btndata"
+                )
+    else:
+        resegment_flag = src.resegment_flag if src else False
+        is_last = src.is_last_node if src else False
+        is_choice = src.is_choice_event if src else True
+        hide_loading = src.hide_loading_screen if src else False
+        prize_box = src.prize_box_index if src else 0
+        mini_game = src.mini_game if src else "FlatReward"
+        contribution_level = src.contribution_level if src else "Node"
+        btn_text = src.button_action_text if src else ""
+        btn_type = src.button_action_type if src else ""
+        btn_data = src.button_action_data if src else ""
+
     if st.button("💾 Сохранить Dummy Node", key=f"{prefix}_save_dummy", type="primary"):
         next_ids = [int(x.strip()) for x in next_ids_str.split(",") if x.strip()]
         custom_texts = process_multiline_text(custom_texts_str)
@@ -323,10 +437,17 @@ def render_dummy_node_form(prefix: str, existing: Optional[DummyNode] = None) ->
             next_node_ids=next_ids if next_ids else [11, 21, 31],
             default_node_id=int(default_node_id),
             rewards=[get_default_reward()],
-            is_choice_event=True,
+            is_choice_event=is_choice,
             custom_texts=custom_texts,
-            hide_loading_screen=False,
-            prize_box_index=0,
+            hide_loading_screen=hide_loading,
+            prize_box_index=int(prize_box),
+            resegment_flag=resegment_flag,
+            is_last_node=is_last,
+            mini_game=mini_game,
+            contribution_level=contribution_level,
+            button_action_text=btn_text,
+            button_action_type=btn_type,
+            button_action_data=btn_data,
         )
     return None
 

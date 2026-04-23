@@ -1,16 +1,6 @@
 import streamlit as st
 from services.state_manager import AppState
-from models.event import PossibleNodeEventData, Segment, Stage, make_node_event
-from models.nodes import Node
-from ui.widgets.node_editor import render_node_editor
-from ui.widgets.event_tree import render_event_tree
-from ui.import_tab import render_batch_import_panel
-from utils.helpers import parse_comma_separated_list
-from utils.constants import DEFAULT_VIP_RANGE
-
-import streamlit as st
-from services.state_manager import AppState
-from models.event import PossibleNodeEventData, Segment, Stage, make_node_event
+from models.event import PossibleNodeEventData, Segment, Stage, make_node_event, get_default_time_warning
 from models.nodes import Node
 from ui.widgets.node_editor import render_node_editor
 from ui.widgets.event_tree import render_event_tree
@@ -23,6 +13,14 @@ from ui.common import inject_sticky_right_column
 def render_editor_tab():
     app_state = AppState.get_instance()
     inject_sticky_right_column()
+
+    # Переключатель расширенных параметров
+    if "show_advanced" not in st.session_state:
+        st.session_state["show_advanced"] = False
+    st.toggle(
+        "🔧 Расширенные параметры",
+        key="show_advanced",
+    )
 
     # Загрузка JSON + счётчик событий
     col_new, col_upload, col_count = st.columns([1, 3, 1])
@@ -201,6 +199,31 @@ def render_editor_tab():
                                     value=event_obj.use_force_landscape_on_web if event_obj else False
                                 )
 
+                        # Расширенные параметры события
+                        if st.session_state.get("show_advanced", False):
+                            with st.expander("⚙️ Расширенные параметры события", expanded=False):
+                                col_e1, col_e2, col_e3 = st.columns(3)
+                                with col_e1:
+                                    starting_currency = st.number_input(
+                                        "StartingEventCurrency",
+                                        value=event_obj.starting_event_currency if event_obj else 0.0,
+                                        step=0.1
+                                    )
+                                with col_e2:
+                                    is_currency_event = st.checkbox(
+                                        "IsCurrencyEvent",
+                                        value=event_obj.is_currency_event if event_obj else False
+                                    )
+                                with col_e3:
+                                    time_warning = st.text_input(
+                                        "TimeWarning (ISO 8601)",
+                                        value=event_obj.time_warning if event_obj else get_default_time_warning()
+                                    )
+                        else:
+                            starting_currency = event_obj.starting_event_currency if event_obj else 0.0
+                            is_currency_event = event_obj.is_currency_event if event_obj else False
+                            time_warning = event_obj.time_warning if event_obj else get_default_time_warning()
+
                         submitted = st.form_submit_button(
                             "💾 Сохранить событие" if editing_event else "➕ Добавить событие"
                         )
@@ -227,6 +250,9 @@ def render_editor_tab():
                                     event_obj.is_prize_pursuit = is_prize_pursuit
                                     event_obj.use_force_landscape_on_web = use_force_landscape
                                     event_obj.show_roundel_on_all_machines = show_roundel_all
+                                    event_obj.starting_event_currency = starting_currency
+                                    event_obj.is_currency_event = is_currency_event
+                                    event_obj.time_warning = time_warning
                                     app_state.apply_editing()
                                     st.success("✅ Событие обновлено")
                                 else:
@@ -248,6 +274,9 @@ def render_editor_tab():
                                         is_prize_pursuit=is_prize_pursuit,
                                         use_force_landscape_on_web=use_force_landscape,
                                         show_roundel_on_all_machines=show_roundel_all,
+                                        starting_event_currency=starting_currency,
+                                        is_currency_event=is_currency_event,
+                                        time_warning=time_warning,
                                     )
                                     app_state.add_event(new_event)
                                     st.success("✅ Событие добавлено")

@@ -151,6 +151,9 @@ def make_node_event(
     is_prize_pursuit: bool = False,
     use_force_landscape_on_web: bool = False,
     show_roundel_on_all_machines: bool = False,
+    starting_event_currency: float = 0.0,
+    is_currency_event: bool = False,
+    time_warning: Optional[str] = None,
 ) -> PossibleNodeEventData:
     """Удобная функция для создания события с автоматическим заполнением скрытых полей."""
     return PossibleNodeEventData(
@@ -171,4 +174,7 @@ def make_node_event(
         is_prize_pursuit=is_prize_pursuit,
         use_force_landscape_on_web=use_force_landscape_on_web,
         show_roundel_on_all_machines=show_roundel_on_all_machines,
+        starting_event_currency=starting_event_currency,
+        is_currency_event=is_currency_event,
+        time_warning=time_warning if time_warning is not None else get_default_time_warning(),
     )
