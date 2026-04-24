@@ -138,8 +138,8 @@ def _get_staged_cfg_with_patch(state: SinglePickState) -> Optional[dict]:
 # ── Тулбар ───────────────────────────────────────────────────────────────────
 
 def _render_toolbar(state: SinglePickState) -> None:
-    with st.expander("🗂️ Загрузка конфига", expanded=True):
-        col_new, col_upload, col_validate = st.columns([1, 3, 2])
+    with st.expander("🗂️ Загрузка и валидация конфига", expanded=False):
+        col_new, col_upload, col_validate = st.columns([1, 2, 2])
 
         with col_new:
             if st.button("🆕 Новый конфиг", use_container_width=True, key="sp_new_config"):

@@ -55,8 +55,10 @@ def render_event_tree():
         event_dict = events_raw[idx]
         event_data = event_dict["PossibleNodeEventData"]
         event_id = event_data["EventID"]
+        segments = event_data.get("Segments", {})
+        n_segments = len(segments)
 
-        with st.expander(f"📦 Событие: {event_id}", expanded=False):
+        with st.expander(f"📦 {event_id}  · {n_segments} сегм.", expanded=False):
             col1, col2, col3, col4 = st.columns([3, 1, 1, 1])
             with col1:
                 st.write(f"**{event_id}**")
@@ -104,7 +106,13 @@ def render_event_tree():
                             info_label = f"{key}: {seg_info[key]}"
                             break
 
-                with st.expander(f"📁 Сегмент: {seg_name} ({info_label})", expanded=False):
+                # Считаем ноды по всем стадиям
+                n_nodes = sum(
+                    len(stage.get("Nodes", []))
+                    for stage in seg_data.get("Stages", [])
+                )
+
+                with st.expander(f"📁 {seg_name}  ({info_label})  · {n_nodes} нод", expanded=False):
                     cols = st.columns([3, 1, 1, 1])
                     with cols[0]:
                         st.write(f"**{seg_name}**")

@@ -318,7 +318,11 @@ def _run_import(df: pd.DataFrame, final: dict):
             continue
         if seg_name not in current_event.segments:
             vip = _vip_range_from_segment_name(seg_name)
-            new_seg = Segment(name=seg_name, vip_range=vip)
+            new_seg = Segment(
+                name=seg_name,
+                segment_info_type="VIPRange" if vip else "",
+                segment_info_value=vip if vip else "",
+            )
             current_event.segments[seg_name] = new_seg
             segments_created += 1
         segments_map[seg_name] = current_event.segments[seg_name]

@@ -17,8 +17,8 @@ def render_editor_tab():
     inject_sticky_right_column()
 
     # Загрузка JSON + счётчик событий
-    with st.expander("🗂️ Загрузка и валидация конфига", expanded=True):
-        col_new, col_upload, col_validate = st.columns([1, 3, 2])
+    with st.expander("🗂️ Загрузка и валидация конфига", expanded=False):
+        col_new, col_upload, col_validate = st.columns([1, 2, 2])
         with col_new:
             if st.button("🆕 Новый конфиг", use_container_width=True):
                 events_raw = app_state.get_events_raw()
