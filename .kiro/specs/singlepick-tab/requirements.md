@@ -47,7 +47,7 @@
 
 ### Requirement 2: Управление ConfigSet-ами
 
-**User Story:** Как конфигуратор, я хочу создавать, переименовывать и удалять именованные ConfigSet-ы, чтобы формировать структуру `ConfigSets` итогового JSON.
+**User Story:** Как конфигуратор, я хочу создавать, переименовывать, дублировать и удалять именованные ConfigSet-ы, чтобы формировать структуру `ConfigSets` итогового JSON.
 
 #### Acceptance Criteria
 
@@ -55,9 +55,10 @@
 2. WHEN пользователь вводит имя ConfigSet, THE Validator SHALL проверять, что имя не пустое и не дублирует существующие имена в текущем конфиге.
 3. IF имя ConfigSet уже существует в текущем конфиге, THEN THE Validator SHALL отображать сообщение об ошибке и блокировать сохранение.
 4. THE SinglePick_Tab SHALL позволять переименовывать существующий ConfigSet.
-5. THE SinglePick_Tab SHALL позволять удалять ConfigSet с подтверждением действия.
-6. WHEN ConfigSet удалён, THE SinglePick_State SHALL немедленно отражать изменение без перезагрузки страницы.
-7. THE SinglePick_Tab SHALL отображать список всех ConfigSet-ов с указанием их типа (Pickers / Wheel).
+5. THE SinglePick_Tab SHALL позволять дублировать ConfigSet; копия вставляется сразу после оригинала с уникальным именем (суффикс `_copy`, `_copy2`, ...).
+6. THE SinglePick_Tab SHALL позволять удалять ConfigSet с подтверждением действия.
+7. WHEN ConfigSet удалён, THE SinglePick_State SHALL немедленно отражать изменение без перезагрузки страницы.
+8. THE SinglePick_Tab SHALL отображать список всех ConfigSet-ов с указанием их типа (Pickers / Wheel).
 
 ---
 

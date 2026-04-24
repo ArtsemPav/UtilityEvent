@@ -16,6 +16,7 @@
 - **Липкая правая панель** — `inject_sticky_right_column()` из `ui/common.py` делает правую колонку редактора фиксированной при прокрутке.
 - **Валидация** — отдельный модуль `services/singlepick_validator.py`, возвращающий список ошибок.
 - **Сборка JSON** — метод `to_dict()` на корневой модели `SinglePickConfig`, форматирование через `json.dumps(..., indent=4, ensure_ascii=False)`.
+- **Дублирование** — ConfigSet, Pick и Wedge можно дублировать кнопкой 📋; копия вставляется сразу после оригинала. Для ConfigSet генерируется уникальное имя с суффиксом `_copy` / `_copy2` и т.д. Реализовано через `copy.deepcopy`.
 
 ---
 
@@ -89,6 +90,16 @@ render_singlepick_tab()
 ```
 
 Все вспомогательные функции — приватные (префикс `_`), определены в том же файле.
+
+#### Дублирование элементов
+
+Дублирование реализовано непосредственно в `_render_tree()` через `copy.deepcopy`:
+
+| Уровень | Кнопка | Поведение |
+|---|---|---|
+| ConfigSet | 📋 (рядом с ⚙️ и ❌) | Глубокая копия `ConfigSet`; уникальное имя `{name}_copy` / `{name}_copy2` ...; вставка сразу после оригинала через перестройку `dict` |
+| Pick | 📋 (рядом с ✏️ и ↑↓) | `copy.deepcopy(pick)` → `pickers.picks.insert(i + 1, new_pick)` |
+| Wedge | 📋 (рядом с ✏️ и ❌) | `copy.deepcopy(wedge)` → `wheel.wedges.insert(i + 1, new_wedge)` |
 
 ### `SinglePickState`
 
@@ -349,14 +360,17 @@ CIJackpot
 │  │  ➕ Добавить ConfigSet   │  │  ➕ Новый ConfigSet          │ │
 │  │                          │  │  — или —                     │ │
 │  │  🃏 Name1 `Pickers`      │  │  ⚙️ Настройки cs_name        │ │
-│  │    ⚙️ Настройки  ❌      │  │    Тип: ● Pickers ○ Wheel   │ │
+│  │    ⚙️ Настройки 📋 ❌    │  │    Тип: ● Pickers ○ Wheel   │ │
 │  │    🔹 1. RewardPick ...  │  │    TotalPickOnBoard: [12]    │ │
-│  │    🔹 2. JackpotPick ... │  │    PickUntilWin: [0]         │ │
-│  │    ➕ [тип] ➕           │  │  — или —                     │ │
-│  │                          │  │  ✏️ cs_name → RewardPick #1  │ │
-│  │  🎡 Name2 `Wheel`        │  │    Weight / PossibleMax      │ │
-│  │    ⚙️ Настройки  ❌      │  │    [Редактор наград]         │ │
-│  │    🔸 1. Wedge ...       │  │                              │ │
+│  │       ✏️ � ↑ ↓ ❌       │  │    PickUntilWin: [0]         │ │
+│  │    🔹 2. JackpotPick ... │  │  — или —                     │ │
+│  │       ✏️ 📋 ↑ ↓ ❌       │  │  ✏️ cs_name → RewardPick #1  │ │
+│  │    ➕ [тип] ➕           │  │    Weight / PossibleMax      │ │
+│  │                          │  │    [Редактор наград]         │ │
+│  │  🎡 Name2 `Wheel`        │  │                              │ │
+│  │    ⚙️ Настройки � ❌    │  │                              │ │
+│  │    �🔸 1. Wedge ...       │  │                              │ │
+│  │       ✏️ 📋 ❌           │  │                              │ │
 │  │    ➕ Добавить сектор    │  │                              │ │
 │  └──────────────────────────┘  └──────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
@@ -445,6 +459,18 @@ CIJackpot
 
 ---
 
+### Property 8: Дублирование ConfigSet
+
+*For any* словаря `config_sets` и имени `cs_name` — операция дублирования должна:
+1. Увеличивать количество ConfigSet-ов ровно на 1.
+2. Создавать копию с именем, отличным от всех существующих имён.
+3. Не изменять оригинальный ConfigSet (глубокая независимость копии).
+4. Вставлять копию на позицию сразу после оригинала.
+
+**Validates: Requirements 2.5**
+
+---
+
 ## Error Handling
 
 | Ситуация | Поведение |
@@ -512,3 +538,7 @@ Round-trip `to_dict()` → `from_dict()` сохраняет эквивалент
 **Property 7** — `@given(picks=st.lists(..., min_size=2), idx=st.integers(min_value=1))`:
 Операция "переместить вверх" корректно переставляет элементы.
 `# Feature: singlepick-tab, Property 7: Перестановка пиков`
+
+**Property 8** — `@given(config_sets=..., cs_name=st.text())`:
+Дублирование ConfigSet создаёт независимую копию с уникальным именем на позиции сразу после оригинала.
+`# Feature: singlepick-tab, Property 8: Дублирование ConfigSet`
