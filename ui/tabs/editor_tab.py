@@ -18,18 +18,20 @@ def render_editor_tab():
 
     # Загрузка JSON + счётчик событий
     with st.expander("🗂️ Загрузка и валидация конфига", expanded=True):
-        col_new, col_upload, col_validate, col_count = st.columns([1, 3, 2, 1])
+        col_new, col_upload, col_validate = st.columns([1, 3, 2])
         with col_new:
             if st.button("🆕 Новый конфиг", use_container_width=True):
                 events_raw = app_state.get_events_raw()
                 if len(events_raw) == 0:
                     app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
+                    app_state.clear_staged()
                     app_state.set_current_event_idx(-1)
                     app_state.clear_editing()
                     st.session_state["creating_event"] = False
                     st.session_state["creating_segment"] = False
                     st.session_state["creating_node"] = False
                     st.session_state["batch_import_event_idx"] = -1
+                    st.session_state.pop("editor_last_loaded_file", None)
                     st.rerun()
                 else:
                     st.session_state["editor_confirm_reset"] = True
@@ -41,12 +43,14 @@ def render_editor_tab():
             with col_yes:
                 if st.button("✅ Да", key="editor_reset_yes"):
                     app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
+                    app_state.clear_staged()
                     app_state.set_current_event_idx(-1)
                     app_state.clear_editing()
                     st.session_state["creating_event"] = False
                     st.session_state["creating_segment"] = False
                     st.session_state["creating_node"] = False
                     st.session_state["batch_import_event_idx"] = -1
+                    st.session_state.pop("editor_last_loaded_file", None)
                     del st.session_state["editor_confirm_reset"]
                     st.rerun()
             with col_no:
@@ -57,27 +61,131 @@ def render_editor_tab():
             st.caption("Загрузка JSON конфига")
             uploaded = st.file_uploader("📂 Загрузить JSON", type=["json"], key="editor_json_uploader", label_visibility="collapsed")
             if uploaded:
-                try:
-                    with st.spinner("Загрузка JSON..."):
-                        cfg = load_config_from_json(uploaded.read())
-                        app_state.set_cfg(cfg)
-                    n_events = len(cfg.get("Events", []))
-                    st.success(f"✅ JSON загружен ({n_events} событий)")
-                except Exception as e:
-                    st.error(f"Ошибка: {e}")
+                last = st.session_state.get("editor_last_loaded_file")
+                if last != uploaded.name:
+                    try:
+                        with st.spinner("Загрузка JSON..."):
+                            cfg = load_config_from_json(uploaded.read())
+                        n_events = len(cfg.get("Events", []))
+                        st.session_state["editor_last_loaded_file"] = uploaded.name
+                        if n_events > 1:
+                            # Большой конфиг — сохраняем как staged, показываем выбор события
+                            app_state.set_staged_cfg(cfg)
+                            st.session_state["editor_staged_file_name"] = uploaded.name
+                            st.session_state.pop("editor_staged_selected_idx", None)
+                            st.rerun()
+                        else:
+                            # Один или ноль событий — загружаем напрямую
+                            app_state.set_cfg(cfg)
+                            app_state.clear_staged()
+                            st.success(f"✅ JSON загружен ({n_events} событий)")
+                    except Exception as e:
+                        st.error(f"Ошибка: {e}")
+
+        # Выбор события из staged конфига
+        staged = app_state.get_staged_cfg()
+        if staged is not None:
+            event_ids = app_state.get_staged_event_ids()
+            st.info(f"📦 Загружен большой конфиг «{st.session_state.get('editor_staged_file_name', '')}» — {len(event_ids)} событий. Выберите событие для редактирования.")
+            col_sel, col_load, col_add = st.columns([3, 1, 1])
+            with col_sel:
+                selected_event_id = st.selectbox(
+                    "Событие для редактирования",
+                    options=event_ids,
+                    key="editor_staged_event_selector",
+                    label_visibility="collapsed",
+                )
+            with col_load:
+                if st.button("✏️ Открыть", use_container_width=True, key="editor_staged_load_btn"):
+                    idx = event_ids.index(selected_event_id)
+                    app_state.load_staged_event(idx)
+                    st.session_state["editor_staged_selected_idx"] = idx
+                    st.rerun()
+            with col_add:
+                if st.button("➕ Добавить", use_container_width=True, key="editor_staged_add_btn"):
+                    st.session_state["editor_staged_creating_new"] = True
+                    st.rerun()
+
+            # Форма создания нового события
+            if st.session_state.get("editor_staged_creating_new"):
+                with st.form(key="editor_staged_new_event_form"):
+                    st.subheader("➕ Новое событие")
+                    col_a, col_b = st.columns(2)
+                    with col_a:
+                        new_event_id = st.text_input("EventID", value="NewEvent")
+                        new_min_level = st.number_input("MinLevel", value=1, min_value=1)
+                        new_segment = st.text_input("Segment", value="Default")
+                    with col_b:
+                        new_content_key = st.text_input("ContentKey", value="NewEvent")
+                        new_repeats = st.number_input("NumberOfRepeats", value=-1)
+                    
+                    col_submit, col_cancel = st.columns(2)
+                    with col_submit:
+                        submitted = st.form_submit_button("💾 Создать и открыть")
+                    with col_cancel:
+                        cancelled = st.form_submit_button("❌ Отмена")
+                    
+                    if submitted:
+                        # Проверка на дубликат EventID
+                        if new_event_id in event_ids:
+                            st.error(f"❌ Событие с EventID '{new_event_id}' уже существует")
+                        else:
+                            new_event = make_node_event(
+                                event_id=new_event_id,
+                                min_level=int(new_min_level),
+                                segment=new_segment,
+                                asset_bundle_path=f"_events/{new_event_id}",
+                                blocker_prefab_path=f"Dialogs/{new_event_id}_Dialog",
+                                roundel_prefab_path=f"Roundels/{new_event_id}_Roundel",
+                                event_card_prefab_path="",
+                                node_completion_prefab_path=f"Dialogs/{new_event_id}_Dialog",
+                                content_key=new_content_key,
+                                number_of_repeats=int(new_repeats),
+                                entry_types=[],
+                            )
+                            app_state.add_new_event_to_staged(new_event)
+                            st.session_state["editor_staged_selected_idx"] = len(event_ids)
+                            del st.session_state["editor_staged_creating_new"]
+                            st.success(f"✅ Событие '{new_event_id}' добавлено")
+                            st.rerun()
+                    
+                    if cancelled:
+                        del st.session_state["editor_staged_creating_new"]
+                        st.rerun()
+
+            # Кнопка применить изменения обратно в staged
+            if st.session_state.get("editor_staged_selected_idx") is not None:
+                col_apply, col_info = st.columns([2, 3])
+                with col_apply:
+                    if st.button("💾 Применить изменения в исходный конфиг", use_container_width=True, key="editor_staged_apply_btn"):
+                        ok = app_state.apply_event_to_staged()
+                        if ok:
+                            st.success("✅ Изменения применены в исходный конфиг")
+                        else:
+                            st.error("Не удалось применить изменения")
+                with col_info:
+                    loaded_id = event_ids[st.session_state["editor_staged_selected_idx"]] \
+                        if st.session_state["editor_staged_selected_idx"] < len(event_ids) else "?"
+                    st.caption(f"Редактируется: **{loaded_id}**  |  Всего событий в исходнике: {len(event_ids)}")
         with col_validate:
             st.caption("Загрузка JSON схемы")
             schema_file = st.file_uploader("📋 Схема для валидации", type=["json"], key="editor_schema_uploader", label_visibility="collapsed")
             if st.button("✅ Проверить валидацию", use_container_width=True, key="editor_validate_btn"):
                 schema = json.loads(schema_file.read()) if schema_file else None
-                valid, msg = validate_config(app_state.get_cfg(), schema)
-                if valid:
-                    st.success("Валиден")
+                # Если есть staged конфиг — валидируем его (с патчем текущего события)
+                staged = app_state.get_staged_cfg()
+                if staged is not None:
+                    cfg_to_validate = app_state.get_staged_cfg_with_patch()
+                    label = f"исходного конфига ({len(cfg_to_validate.get('Events', []))} событий)"
                 else:
-                    st.error(f"Не валиден: {msg}")
-        with col_count:
-            events_raw = app_state.get_events_raw()
-            st.info(f"📊 Событий: {len(events_raw)}")
+                    cfg_to_validate = app_state.get_cfg()
+                    label = "конфига"
+                valid, msg = validate_config(cfg_to_validate, schema)
+                if valid:
+                    st.success(f"Валиден ({label})")
+                else:
+                    st.error(f"Не валиден ({label}): {msg}")
+
 
     st.divider()
 

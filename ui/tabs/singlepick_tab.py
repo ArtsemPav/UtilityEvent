@@ -32,6 +32,10 @@ class SinglePickState:
     confirm_delete_cs: str
     confirm_type_change: bool
 
+    # Staged-конфиг: исходный большой файл
+    staged_cfg: Optional[dict] = None          # полный исходный конфиг (сырой dict)
+    staged_cs_name: Optional[str] = None       # имя выбранного ConfigSet в staged_cfg
+
 
 def get_singlepick_state() -> SinglePickState:
     if "singlepick_state" not in st.session_state:
@@ -40,6 +44,8 @@ def get_singlepick_state() -> SinglePickState:
             editing=("", "", -1),
             confirm_delete_cs="",
             confirm_type_change=False,
+            staged_cfg=None,
+            staged_cs_name=None,
         )
     return st.session_state["singlepick_state"]
 
@@ -74,17 +80,74 @@ def _default_pickers_config() -> PickersConfig:
     )
 
 
+def _get_staged_cs_names(state: SinglePickState) -> list:
+    """Возвращает список имён ConfigSet из staged конфига."""
+    if state.staged_cfg is None:
+        return []
+    return list(state.staged_cfg.get("ConfigSets", {}).keys())
+
+
+def _load_staged_cs(state: SinglePickState, cs_name: str) -> None:
+    """Загружает один ConfigSet из staged конфига в редактор."""
+    if state.staged_cfg is None:
+        return
+    cs_raw = state.staged_cfg.get("ConfigSets", {}).get(cs_name)
+    if cs_raw is None:
+        return
+    state.staged_cs_name = cs_name
+    single_cfg = {"ConfigSets": {cs_name: copy.deepcopy(cs_raw)}}
+    config = SinglePickConfig.from_dict(single_cfg)
+    state.config = config
+    state.editing = ("", "", -1)
+
+
+def _apply_cs_to_staged(state: SinglePickState) -> bool:
+    """Применяет отредактированный ConfigSet обратно в staged конфиг."""
+    if state.staged_cfg is None or state.staged_cs_name is None:
+        return False
+    if state.staged_cs_name not in state.staged_cfg.get("ConfigSets", {}):
+        return False
+    cs = state.config.config_sets.get(state.staged_cs_name)
+    if cs is None:
+        return False
+    state.staged_cfg["ConfigSets"][state.staged_cs_name] = copy.deepcopy(cs.to_dict())
+    return True
+
+
+def _add_cs_to_staged(state: SinglePickState, cs_name: str, cs: ConfigSet) -> None:
+    """Добавляет новый ConfigSet в staged конфиг и загружает его в редактор."""
+    if state.staged_cfg is None:
+        state.staged_cfg = {"ConfigSets": {}}
+    state.staged_cfg.setdefault("ConfigSets", {})[cs_name] = copy.deepcopy(cs.to_dict())
+    state.staged_cs_name = cs_name
+    state.config = SinglePickConfig(config_sets={cs_name: copy.deepcopy(cs)})
+    state.editing = (cs_name, "", -1)
+
+
+def _get_staged_cfg_with_patch(state: SinglePickState) -> Optional[dict]:
+    """Возвращает staged конфиг с применёнными изменениями текущего ConfigSet."""
+    if state.staged_cfg is None:
+        return None
+    patched = copy.deepcopy(state.staged_cfg)
+    if state.staged_cs_name and state.staged_cs_name in state.config.config_sets:
+        cs = state.config.config_sets[state.staged_cs_name]
+        patched["ConfigSets"][state.staged_cs_name] = copy.deepcopy(cs.to_dict())
+    return patched
+
+
 # ── Тулбар ───────────────────────────────────────────────────────────────────
 
 def _render_toolbar(state: SinglePickState) -> None:
     with st.expander("🗂️ Загрузка конфига", expanded=True):
-        col_new, col_upload, col_validate, col_count = st.columns([1, 3, 2, 1])
+        col_new, col_upload, col_validate = st.columns([1, 3, 2])
 
         with col_new:
             if st.button("🆕 Новый конфиг", use_container_width=True, key="sp_new_config"):
                 if len(state.config.config_sets) == 0:
                     state.config = SinglePickConfig(config_sets={})
                     state.editing = ("", "", -1)
+                    state.staged_cfg = None
+                    state.staged_cs_name = None
                     st.session_state.pop("sp_last_loaded_file", None)
                     st.rerun()
                 else:
@@ -98,6 +161,8 @@ def _render_toolbar(state: SinglePickState) -> None:
                 if st.button("✅ Да", key="sp_reset_yes"):
                     state.config = SinglePickConfig(config_sets={})
                     state.editing = ("", "", -1)
+                    state.staged_cfg = None
+                    state.staged_cs_name = None
                     del st.session_state["sp_confirm_reset"]
                     st.session_state.pop("sp_last_loaded_file", None)
                     st.rerun()
@@ -118,14 +183,96 @@ def _render_toolbar(state: SinglePickState) -> None:
                     try:
                         data = load_config_from_json(uploaded.read())
                         config = SinglePickConfig.from_dict(data)
-                        state.config = config
-                        state.editing = ("", "", -1)
-                        st.session_state["sp_last_loaded_file"] = uploaded.name
-                        st.success(f"✅ Загружено ConfigSet-ов: {len(config.config_sets)}")
+                        n_cs = len(config.config_sets)
+                        if n_cs > 1:
+                            # Большой конфиг — сохраняем как staged
+                            state.staged_cfg = data
+                            state.staged_cs_name = None
+                            st.session_state["sp_last_loaded_file"] = uploaded.name
+                            st.session_state.pop("sp_staged_selected_cs", None)
+                            st.rerun()
+                        else:
+                            # Один или ноль ConfigSet — загружаем напрямую
+                            state.config = config
+                            state.staged_cfg = None
+                            state.staged_cs_name = None
+                            state.editing = ("", "", -1)
+                            st.session_state["sp_last_loaded_file"] = uploaded.name
+                            st.success(f"✅ Загружено ConfigSet-ов: {n_cs}")
                     except ValueError as e:
                         st.error(f"Файл не является SinglePick конфигом: {e}")
                     except Exception as e:
                         st.error(f"Ошибка загрузки: {e}")
+
+        # Выбор ConfigSet из staged конфига
+        if state.staged_cfg is not None:
+            cs_names = _get_staged_cs_names(state)
+            st.info(f"📦 Загружен большой конфиг «{st.session_state.get('sp_last_loaded_file', '')}» — {len(cs_names)} ConfigSet-ов. Выберите ConfigSet для редактирования.")
+            col_sel, col_load, col_add = st.columns([3, 1, 1])
+            with col_sel:
+                selected_cs = st.selectbox(
+                    "ConfigSet для редактирования",
+                    options=cs_names,
+                    key="sp_staged_cs_selector",
+                    label_visibility="collapsed",
+                )
+            with col_load:
+                if st.button("✏️ Открыть", use_container_width=True, key="sp_staged_load_btn"):
+                    _load_staged_cs(state, selected_cs)
+                    st.session_state["sp_staged_selected_cs"] = selected_cs
+                    st.rerun()
+            with col_add:
+                if st.button("➕ Добавить", use_container_width=True, key="sp_staged_add_btn"):
+                    st.session_state["sp_staged_creating_new"] = True
+                    st.rerun()
+
+            # Форма создания нового ConfigSet
+            if st.session_state.get("sp_staged_creating_new"):
+                with st.form(key="sp_staged_new_cs_form"):
+                    st.subheader("➕ Новый ConfigSet")
+                    new_cs_name = st.text_input("Имя ConfigSet", value="NewConfigSet")
+                    new_cs_type = st.radio("Тип", ["Pickers", "Wheel"], horizontal=True)
+                    
+                    col_submit, col_cancel = st.columns(2)
+                    with col_submit:
+                        submitted = st.form_submit_button("💾 Создать и открыть")
+                    with col_cancel:
+                        cancelled = st.form_submit_button("❌ Отмена")
+                    
+                    if submitted:
+                        err = validate_configset_name(new_cs_name, cs_names)
+                        if err:
+                            st.error(err)
+                        else:
+                            content = (
+                                _default_pickers_config()
+                                if new_cs_type == "Pickers"
+                                else WheelConfig(wedges=[])
+                            )
+                            new_cs = ConfigSet(content=content)
+                            _add_cs_to_staged(state, new_cs_name, new_cs)
+                            st.session_state["sp_staged_selected_cs"] = new_cs_name
+                            del st.session_state["sp_staged_creating_new"]
+                            st.success(f"✅ ConfigSet '{new_cs_name}' добавлен")
+                            st.rerun()
+                    
+                    if cancelled:
+                        del st.session_state["sp_staged_creating_new"]
+                        st.rerun()
+
+            # Кнопка применить изменения обратно в staged
+            if st.session_state.get("sp_staged_selected_cs") is not None:
+                col_apply, col_info = st.columns([2, 3])
+                with col_apply:
+                    if st.button("💾 Применить изменения в исходный конфиг", use_container_width=True, key="sp_staged_apply_btn"):
+                        ok = _apply_cs_to_staged(state)
+                        if ok:
+                            st.success("✅ Изменения применены в исходный конфиг")
+                        else:
+                            st.error("Не удалось применить изменения")
+                with col_info:
+                    loaded_cs = st.session_state["sp_staged_selected_cs"]
+                    st.caption(f"Редактируется: **{loaded_cs}**  |  Всего ConfigSet-ов в исходнике: {len(cs_names)}")
 
         with col_validate:
             st.caption("Загрузка JSON схемы")
@@ -144,16 +291,22 @@ def _render_toolbar(state: SinglePickState) -> None:
                     # Если загружена схема — дополнительно проверяем по JSON Schema
                     if schema_file:
                         schema = json.loads(schema_file.read())
-                        valid, msg = validate_config(state.config.to_dict(), schema)
-                        if valid:
-                            st.success("Валиден (схема и логика)")
+                        # Валидируем staged конфиг с патчем если он есть
+                        if state.staged_cfg is not None:
+                            cfg_to_validate = _get_staged_cfg_with_patch(state)
+                            label = f"исходного конфига ({len(_get_staged_cs_names(state))} ConfigSet-ов)"
                         else:
-                            st.error(f"Не валиден по схеме: {msg}")
+                            cfg_to_validate = state.config.to_dict()
+                            label = "конфига"
+                        valid, msg = validate_config(cfg_to_validate, schema)
+                        if valid:
+                            st.success(f"Валиден ({label}, схема и логика)")
+                        else:
+                            st.error(f"Не валиден по схеме ({label}): {msg}")
                     else:
                         st.success("Валиден")
 
-        with col_count:
-            st.info(f"📊 ConfigSet-ов: {len(state.config.config_sets)}")
+
 
 
 # ── Дерево (левая колонка) ────────────────────────────────────────────────────

@@ -18,6 +18,10 @@ class AppState:
         self.temp_data = {}
         self._event_cache: Dict[int, PossibleNodeEventData] = {}  # кэш десериализованных событий
 
+        # Staged-конфиг: исходный большой файл, из которого выбрано одно событие для редактирования
+        self.staged_cfg: Optional[dict] = None          # полный исходный конфиг
+        self.staged_event_idx: int = -1                 # индекс выбранного события в staged_cfg
+
     @classmethod
     def get_instance(cls):
         """Возвращает экземпляр AppState из session_state, создаёт при необходимости."""
@@ -343,6 +347,89 @@ class AppState:
                 if 0 <= ctx["stage_idx"] < len(segment.stages) and 0 <= ctx["node_idx"] < len(segment.stages[ctx["stage_idx"]].nodes):
                     segment.stages[ctx["stage_idx"]].nodes[ctx["node_idx"]] = ctx["copy"]
                     self.update_event(ctx["event_idx"], event)
+        self.clear_editing()
+
+    # --- Staged-конфиг (большой исходный файл) ---
+
+    def set_staged_cfg(self, cfg: dict) -> None:
+        """Сохраняет исходный большой конфиг без применения к редактору."""
+        self.staged_cfg = cfg
+        self.staged_event_idx = -1
+
+    def get_staged_cfg(self) -> Optional[dict]:
+        return self.staged_cfg
+
+    def get_staged_event_ids(self) -> List[str]:
+        """Возвращает список EventID из staged конфига."""
+        if self.staged_cfg is None:
+            return []
+        return [
+            e.get("PossibleNodeEventData", {}).get("EventID", f"[{i}]")
+            for i, e in enumerate(self.staged_cfg.get("Events", []))
+        ]
+
+    def load_staged_event(self, event_idx: int) -> None:
+        """Загружает одно событие из staged конфига в редактор."""
+        if self.staged_cfg is None:
+            return
+        events = self.staged_cfg.get("Events", [])
+        if not (0 <= event_idx < len(events)):
+            return
+        self.staged_event_idx = event_idx
+        # Создаём рабочий конфиг с одним событием
+        single_cfg = {
+            "Events": [copy.deepcopy(events[event_idx])],
+            "IsFallbackConfig": self.staged_cfg.get("IsFallbackConfig", False),
+        }
+        self.set_cfg(single_cfg)
+        self.set_current_event_idx(0)
+        self.clear_editing()
+
+    def apply_event_to_staged(self) -> bool:
+        """
+        Применяет отредактированное событие обратно в staged конфиг.
+        Возвращает True при успехе.
+        """
+        if self.staged_cfg is None or self.staged_event_idx < 0:
+            return False
+        events = self.staged_cfg.get("Events", [])
+        if not (0 <= self.staged_event_idx < len(events)):
+            return False
+        current_events = self.cfg.get("Events", [])
+        if not current_events:
+            return False
+        events[self.staged_event_idx] = copy.deepcopy(current_events[0])
+        return True
+
+    def get_staged_cfg_with_patch(self) -> Optional[dict]:
+        """Возвращает staged конфиг с уже применёнными изменениями текущего события."""
+        if self.staged_cfg is None:
+            return None
+        patched = copy.deepcopy(self.staged_cfg)
+        current_events = self.cfg.get("Events", [])
+        if current_events and 0 <= self.staged_event_idx < len(patched.get("Events", [])):
+            patched["Events"][self.staged_event_idx] = copy.deepcopy(current_events[0])
+        return patched
+
+    def clear_staged(self) -> None:
+        """Сбрасывает staged конфиг."""
+        self.staged_cfg = None
+        self.staged_event_idx = -1
+
+    def add_new_event_to_staged(self, event: PossibleNodeEventData) -> None:
+        """Добавляет новое событие в staged конфиг и загружает его в редактор."""
+        if self.staged_cfg is None:
+            # Если staged нет — создаём его
+            self.staged_cfg = {"Events": [], "IsFallbackConfig": False}
+        self.staged_cfg["Events"].append(event.to_dict())
+        self.staged_event_idx = len(self.staged_cfg["Events"]) - 1
+        # Загружаем новое событие в редактор
+        single_cfg = {
+            "Events": [copy.deepcopy(event.to_dict())],
+            "IsFallbackConfig": self.staged_cfg.get("IsFallbackConfig", False),
+        }
+        self.set_cfg(single_cfg)
+        self.set_current_event_idx(0)
         self.clear_editing()
 
     # --- Временные данные форм ---

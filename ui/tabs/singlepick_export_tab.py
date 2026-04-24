@@ -44,12 +44,28 @@ def render_singlepick_export_tab() -> None:
 
     st.header("📤 Экспорт SinglePick")
 
-    errors = validate_singlepick(state.config)
-    is_empty = len(state.config.config_sets) == 0
+    # Если есть staged конфиг — работаем с ним (с патчем текущего ConfigSet)
+    if state.staged_cfg is not None:
+        from ui.tabs.singlepick_tab import _get_staged_cfg_with_patch, _get_staged_cs_names
+        export_dict = _get_staged_cfg_with_patch(state)
+        staged_file = st.session_state.get("sp_last_loaded_file", "исходный файл")
+        n_cs_staged = len(_get_staged_cs_names(state))
+        st.info(f"📦 Экспортируется исходный конфиг «{staged_file}» с применёнными изменениями ({n_cs_staged} ConfigSet-ов)")
+        # Для встроенной валидации используем только текущий редактируемый конфиг
+        errors = validate_singlepick(state.config)
+        is_empty = n_cs_staged == 0
+    else:
+        export_dict = state.config.to_dict()
+        errors = validate_singlepick(state.config)
+        is_empty = len(state.config.config_sets) == 0
     has_errors = len(errors) > 0
 
     # Счётчик
-    st.caption(f"ConfigSet-ов в конфиге: {len(state.config.config_sets)}")
+    if state.staged_cfg is not None:
+        from ui.tabs.singlepick_tab import _get_staged_cs_names
+        st.caption(f"ConfigSet-ов в конфиге: {len(_get_staged_cs_names(state))}")
+    else:
+        st.caption(f"ConfigSet-ов в конфиге: {len(state.config.config_sets)}")
 
     if is_empty:
         st.info("Нет конфигов для экспорта. Перейдите на вкладку 🎰Редактор SinglePick и создайте конфиг.")
@@ -70,7 +86,7 @@ def render_singlepick_export_tab() -> None:
         for e in errors:
             st.warning(f"**[{e.configset_name}]** `{e.field}`: {e.message}")
 
-    json_str = json.dumps(state.config.to_dict(), ensure_ascii=False, indent=4)
+    json_str = json.dumps(export_dict, ensure_ascii=False, indent=4)
 
     # Кнопки скачивания и копирования
     col_dl, col_cp = st.columns(2)
@@ -95,7 +111,11 @@ def render_singlepick_export_tab() -> None:
     # Предпросмотр с фильтром по ConfigSet
     st.subheader("🔍 Предпросмотр JSON")
 
-    config_set_names = list(state.config.config_sets.keys())
+    if state.staged_cfg is not None:
+        from ui.tabs.singlepick_tab import _get_staged_cs_names
+        config_set_names = _get_staged_cs_names(state)
+    else:
+        config_set_names = list(state.config.config_sets.keys())
     col_filter, col_btn = st.columns([3, 1])
     with col_filter:
         selected = st.selectbox(
@@ -109,11 +129,11 @@ def render_singlepick_export_tab() -> None:
 
     if show:
         if selected == "— Весь конфиг —":
-            preview_data = state.config.to_dict()
+            preview_data = export_dict
             filename_hint = "SinglePickConfig.json"
         else:
-            cs = state.config.config_sets.get(selected)
-            preview_data = {"ConfigSets": {selected: cs.to_dict()}} if cs else {}
+            cs_data = export_dict.get("ConfigSets", {}).get(selected)
+            preview_data = {"ConfigSets": {selected: cs_data}} if cs_data else {}
             filename_hint = f"{selected}.json"
 
         st.session_state["singlepick_export_preview_json"] = json.dumps(

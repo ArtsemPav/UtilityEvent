@@ -60,7 +60,15 @@ def render_export_tab():
     app_state = AppState.get_instance()
     st.header("💾 Экспорт LiveEvent")
 
-    cfg = app_state.get_cfg()
+    # Если есть staged конфиг — работаем с ним (с патчем текущего события)
+    staged = app_state.get_staged_cfg()
+    if staged is not None:
+        cfg = app_state.get_staged_cfg_with_patch()
+        staged_file = st.session_state.get("editor_staged_file_name", "исходный файл")
+        st.info(f"📦 Экспортируется исходный конфиг «{staged_file}» с применёнными изменениями ({len(cfg.get('Events', []))} событий)")
+    else:
+        cfg = app_state.get_cfg()
+
     events_raw = cfg.get("Events", [])
     n_events = len(events_raw)
     is_empty = n_events == 0
