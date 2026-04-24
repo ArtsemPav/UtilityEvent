@@ -1,5 +1,7 @@
 import streamlit as st
+import json
 from services.state_manager import AppState
+from services.json_io import load_config_from_json, validate_config
 from models.event import PossibleNodeEventData, Segment, Stage, make_node_event, get_default_time_warning
 from models.nodes import Node
 from ui.widgets.node_editor import render_node_editor
@@ -14,64 +16,68 @@ def render_editor_tab():
     app_state = AppState.get_instance()
     inject_sticky_right_column()
 
-    # Переключатель расширенных параметров
-    if "show_advanced" not in st.session_state:
-        st.session_state["show_advanced"] = False
-    st.toggle(
-        "🔧 Расширенные параметры",
-        key="show_advanced",
-    )
-
     # Загрузка JSON + счётчик событий
-    col_new, col_upload, col_count = st.columns([1, 3, 1])
-    with col_new:
-        if st.button("🆕 Новый конфиг", use_container_width=True):
-            events_raw = app_state.get_events_raw()
-            if len(events_raw) == 0:
-                app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
-                app_state.set_current_event_idx(-1)
-                app_state.clear_editing()
-                st.session_state["creating_event"] = False
-                st.session_state["creating_segment"] = False
-                st.session_state["creating_node"] = False
-                st.session_state["batch_import_event_idx"] = -1
-                st.rerun()
-            else:
-                st.session_state["editor_confirm_reset"] = True
-                st.rerun()
+    with st.expander("🗂️ Загрузка и валидация конфига", expanded=True):
+        col_new, col_upload, col_validate, col_count = st.columns([1, 3, 2, 1])
+        with col_new:
+            if st.button("🆕 Новый конфиг", use_container_width=True):
+                events_raw = app_state.get_events_raw()
+                if len(events_raw) == 0:
+                    app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
+                    app_state.set_current_event_idx(-1)
+                    app_state.clear_editing()
+                    st.session_state["creating_event"] = False
+                    st.session_state["creating_segment"] = False
+                    st.session_state["creating_node"] = False
+                    st.session_state["batch_import_event_idx"] = -1
+                    st.rerun()
+                else:
+                    st.session_state["editor_confirm_reset"] = True
+                    st.rerun()
 
-    if st.session_state.get("editor_confirm_reset"):
-        st.warning("Сбросить конфиг? Все данные будут потеряны.")
-        col_yes, col_no = st.columns(2)
-        with col_yes:
-            if st.button("✅ Да", key="editor_reset_yes"):
-                app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
-                app_state.set_current_event_idx(-1)
-                app_state.clear_editing()
-                st.session_state["creating_event"] = False
-                st.session_state["creating_segment"] = False
-                st.session_state["creating_node"] = False
-                st.session_state["batch_import_event_idx"] = -1
-                del st.session_state["editor_confirm_reset"]
-                st.rerun()
-        with col_no:
-            if st.button("❌ Нет", key="editor_reset_no"):
-                del st.session_state["editor_confirm_reset"]
-                st.rerun()
-    with col_upload:
-        uploaded = st.file_uploader("📂 Загрузить JSON", type=["json"], key="editor_json_uploader", label_visibility="collapsed")
-        if uploaded:
-            try:
-                with st.spinner("Загрузка JSON..."):
-                    cfg = load_config_from_json(uploaded.read())
-                    app_state.set_cfg(cfg)
-                n_events = len(cfg.get("Events", []))
-                st.success(f"✅ JSON загружен ({n_events} событий)")
-            except Exception as e:
-                st.error(f"Ошибка: {e}")
-    with col_count:
-        events_raw = app_state.get_events_raw()
-        st.info(f"📊 Событий: {len(events_raw)}")
+        if st.session_state.get("editor_confirm_reset"):
+            st.warning("Сбросить конфиг? Все данные будут потеряны.")
+            col_yes, col_no = st.columns(2)
+            with col_yes:
+                if st.button("✅ Да", key="editor_reset_yes"):
+                    app_state.set_cfg({"Events": [], "IsFallbackConfig": False})
+                    app_state.set_current_event_idx(-1)
+                    app_state.clear_editing()
+                    st.session_state["creating_event"] = False
+                    st.session_state["creating_segment"] = False
+                    st.session_state["creating_node"] = False
+                    st.session_state["batch_import_event_idx"] = -1
+                    del st.session_state["editor_confirm_reset"]
+                    st.rerun()
+            with col_no:
+                if st.button("❌ Нет", key="editor_reset_no"):
+                    del st.session_state["editor_confirm_reset"]
+                    st.rerun()
+        with col_upload:
+            st.caption("Загрузка JSON конфига")
+            uploaded = st.file_uploader("📂 Загрузить JSON", type=["json"], key="editor_json_uploader", label_visibility="collapsed")
+            if uploaded:
+                try:
+                    with st.spinner("Загрузка JSON..."):
+                        cfg = load_config_from_json(uploaded.read())
+                        app_state.set_cfg(cfg)
+                    n_events = len(cfg.get("Events", []))
+                    st.success(f"✅ JSON загружен ({n_events} событий)")
+                except Exception as e:
+                    st.error(f"Ошибка: {e}")
+        with col_validate:
+            st.caption("Загрузка JSON схемы")
+            schema_file = st.file_uploader("📋 Схема для валидации", type=["json"], key="editor_schema_uploader", label_visibility="collapsed")
+            if st.button("✅ Проверить валидацию", use_container_width=True, key="editor_validate_btn"):
+                schema = json.loads(schema_file.read()) if schema_file else None
+                valid, msg = validate_config(app_state.get_cfg(), schema)
+                if valid:
+                    st.success("Валиден")
+                else:
+                    st.error(f"Не валиден: {msg}")
+        with col_count:
+            events_raw = app_state.get_events_raw()
+            st.info(f"📊 Событий: {len(events_raw)}")
 
     st.divider()
 
@@ -429,6 +435,9 @@ def render_editor_tab():
                         app_state.clear_editing()
                         st.session_state["creating_node"] = False
                         st.rerun()
+
+            if not show_step1 and not show_step3 and not st.session_state.get("creating_segment", False):
+                st.info("Выберите элемент в дереве для редактирования.")
 
     with right_col:
         st.subheader("🌳 Структура событий")

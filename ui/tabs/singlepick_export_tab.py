@@ -52,7 +52,7 @@ def render_singlepick_export_tab() -> None:
     st.caption(f"ConfigSet-ов в конфиге: {len(state.config.config_sets)}")
 
     if is_empty:
-        st.info("Нет ConfigSet-ов для экспорта. Перейдите на вкладку 🎰 SinglePick и создайте конфиг.")
+        st.info("Нет конфигов для экспорта. Перейдите на вкладку 🎰Редактор SinglePick и создайте конфиг.")
         st.download_button(
             "📥 Скачать SinglePickConfig.json",
             data=b"",

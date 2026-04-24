@@ -12,7 +12,7 @@ from models.singlepick import (
     Wedge,
 )
 from services.singlepick_validator import validate_singlepick, validate_configset_name
-from services.json_io import load_config_from_json
+from services.json_io import load_config_from_json, validate_config
 from ui.widgets.singlepick_reward_widget import render_sp_reward_widget
 from ui.widgets.singlepick_rewards_editor import render_sp_rewards_editor, get_default_sp_reward
 
@@ -77,56 +77,83 @@ def _default_pickers_config() -> PickersConfig:
 # ── Тулбар ───────────────────────────────────────────────────────────────────
 
 def _render_toolbar(state: SinglePickState) -> None:
-    col_new, col_upload, col_count = st.columns([1, 3, 1])
+    with st.expander("🗂️ Загрузка конфига", expanded=True):
+        col_new, col_upload, col_validate, col_count = st.columns([1, 3, 2, 1])
 
-    with col_new:
-        if st.button("🆕 Новый конфиг", use_container_width=True, key="sp_new_config"):
-            if len(state.config.config_sets) == 0:
-                state.config = SinglePickConfig(config_sets={})
-                state.editing = ("", "", -1)
-                st.session_state.pop("sp_last_loaded_file", None)
-                st.rerun()
-            else:
-                st.session_state["sp_confirm_reset"] = True
-                st.rerun()
-
-    if st.session_state.get("sp_confirm_reset"):
-        st.warning("Сбросить конфиг? Все данные будут потеряны.")
-        cy, cn = st.columns(2)
-        with cy:
-            if st.button("✅ Да", key="sp_reset_yes"):
-                state.config = SinglePickConfig(config_sets={})
-                state.editing = ("", "", -1)
-                del st.session_state["sp_confirm_reset"]
-                st.session_state.pop("sp_last_loaded_file", None)
-                st.rerun()
-        with cn:
-            if st.button("❌ Нет", key="sp_reset_no"):
-                del st.session_state["sp_confirm_reset"]
-                st.rerun()
-
-    with col_upload:
-        uploaded = st.file_uploader(
-            "📂 Загрузить JSON", type=["json"],
-            key="sp_json_uploader", label_visibility="collapsed"
-        )
-        if uploaded:
-            last = st.session_state.get("sp_last_loaded_file")
-            if last != uploaded.name:
-                try:
-                    data = load_config_from_json(uploaded.read())
-                    config = SinglePickConfig.from_dict(data)
-                    state.config = config
+        with col_new:
+            if st.button("🆕 Новый конфиг", use_container_width=True, key="sp_new_config"):
+                if len(state.config.config_sets) == 0:
+                    state.config = SinglePickConfig(config_sets={})
                     state.editing = ("", "", -1)
-                    st.session_state["sp_last_loaded_file"] = uploaded.name
-                    st.success(f"✅ Загружено ConfigSet-ов: {len(config.config_sets)}")
-                except ValueError as e:
-                    st.error(f"Файл не является SinglePick конфигом: {e}")
-                except Exception as e:
-                    st.error(f"Ошибка загрузки: {e}")
+                    st.session_state.pop("sp_last_loaded_file", None)
+                    st.rerun()
+                else:
+                    st.session_state["sp_confirm_reset"] = True
+                    st.rerun()
 
-    with col_count:
-        st.info(f"📊 ConfigSet-ов: {len(state.config.config_sets)}")
+        if st.session_state.get("sp_confirm_reset"):
+            st.warning("Сбросить конфиг? Все данные будут потеряны.")
+            cy, cn = st.columns(2)
+            with cy:
+                if st.button("✅ Да", key="sp_reset_yes"):
+                    state.config = SinglePickConfig(config_sets={})
+                    state.editing = ("", "", -1)
+                    del st.session_state["sp_confirm_reset"]
+                    st.session_state.pop("sp_last_loaded_file", None)
+                    st.rerun()
+            with cn:
+                if st.button("❌ Нет", key="sp_reset_no"):
+                    del st.session_state["sp_confirm_reset"]
+                    st.rerun()
+
+        with col_upload:
+            st.caption("Загрузка JSON конфига")
+            uploaded = st.file_uploader(
+                "📂 Загрузить JSON", type=["json"],
+                key="sp_json_uploader", label_visibility="collapsed"
+            )
+            if uploaded:
+                last = st.session_state.get("sp_last_loaded_file")
+                if last != uploaded.name:
+                    try:
+                        data = load_config_from_json(uploaded.read())
+                        config = SinglePickConfig.from_dict(data)
+                        state.config = config
+                        state.editing = ("", "", -1)
+                        st.session_state["sp_last_loaded_file"] = uploaded.name
+                        st.success(f"✅ Загружено ConfigSet-ов: {len(config.config_sets)}")
+                    except ValueError as e:
+                        st.error(f"Файл не является SinglePick конфигом: {e}")
+                    except Exception as e:
+                        st.error(f"Ошибка загрузки: {e}")
+
+        with col_validate:
+            st.caption("Загрузка JSON схемы")
+            schema_file = st.file_uploader(
+                "📋 Схема для валидации", type=["json"],
+                key="sp_schema_uploader", label_visibility="collapsed"
+            )
+            if st.button("✅ Проверить валидацию", use_container_width=True, key="sp_validate_btn"):
+                # Встроенная валидация через singlepick_validator
+                errors = validate_singlepick(state.config)
+                if errors:
+                    st.error(f"Найдено ошибок: {len(errors)}")
+                    for e in errors:
+                        st.warning(f"**[{e.configset_name}]** `{e.field}`: {e.message}")
+                else:
+                    # Если загружена схема — дополнительно проверяем по JSON Schema
+                    if schema_file:
+                        schema = json.loads(schema_file.read())
+                        valid, msg = validate_config(state.config.to_dict(), schema)
+                        if valid:
+                            st.success("Валиден (схема и логика)")
+                        else:
+                            st.error(f"Не валиден по схеме: {msg}")
+                    else:
+                        st.success("Валиден")
+
+        with col_count:
+            st.info(f"📊 ConfigSet-ов: {len(state.config.config_sets)}")
 
 
 # ── Дерево (левая колонка) ────────────────────────────────────────────────────

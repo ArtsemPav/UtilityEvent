@@ -3,14 +3,14 @@ import streamlit as st
 import streamlit.components.v1 as components
 from services.json_io import save_config_to_json
 from services.state_manager import AppState
+from utils.validators import validate_event_id
 
 
-def _copy_button(text: str, key: str) -> None:
+def _copy_button(text: str) -> None:
     """Рендерит кнопку 'Копировать в буфер' через JS."""
     import hashlib
-    btn_id = "cpbtn_" + hashlib.md5(key.encode()).hexdigest()[:8]
-    # Кодируем текст в base64 чтобы избежать любых проблем с экранированием
     import base64
+    btn_id = "cpbtn_" + hashlib.md5(text[:64].encode()).hexdigest()[:8]
     b64 = base64.b64encode(text.encode("utf-8")).decode("ascii")
     components.html(
         f"""
@@ -39,40 +39,81 @@ def _copy_button(text: str, key: str) -> None:
     )
 
 
+def _validate_liveevent(cfg: dict) -> list[str]:
+    """Базовая валидация конфига LiveEvent. Возвращает список ошибок."""
+    errors = []
+    events_raw = cfg.get("Events", [])
+    seen_ids = []
+    for i, event in enumerate(events_raw):
+        event_id = event.get("PossibleNodeEventData", {}).get("EventID", "")
+        errs = validate_event_id(event_id)
+        for e in errs:
+            errors.append(f"Событие #{i+1}: {e}")
+        if event_id and event_id in seen_ids:
+            errors.append(f"Событие #{i+1}: дублирующийся EventID «{event_id}»")
+        if event_id:
+            seen_ids.append(event_id)
+    return errors
+
+
 def render_export_tab():
     app_state = AppState.get_instance()
-    st.header("🌳 Структура и сохранение")
+    st.header("💾 Экспорт LiveEvent")
 
     cfg = app_state.get_cfg()
     events_raw = cfg.get("Events", [])
     n_events = len(events_raw)
+    is_empty = n_events == 0
+
     st.caption(f"Событий в конфиге: {n_events}")
 
-    # ── Скачивание ──────────────────────────────────────────────────────────
+    if is_empty:
+        st.info("Нет событий для экспорта. Перейдите на вкладку ✏️Редактор LiveEvent и создайте конфиг.")
+        st.download_button(
+            "📥 Скачать LiveEventData.json",
+            data=b"",
+            file_name="LiveEventData.json",
+            mime="application/json",
+            disabled=True,
+            use_container_width=True,
+            key="liveevent_export_download_empty",
+        )
+        return
+
+    # Валидация
+    errors = _validate_liveevent(cfg)
+    has_errors = len(errors) > 0
+
+    if errors:
+        st.error(f"Найдено ошибок: {len(errors)}. Исправьте их перед экспортом.")
+        for e in errors:
+            st.warning(e)
+
     full_json_str = save_config_to_json(cfg).decode("utf-8")
 
+    # Кнопки скачивания и копирования
     col_dl, col_cp = st.columns(2)
     with col_dl:
         st.download_button(
-            label="📥 Скачать JSON файл",
+            label="📥 Скачать LiveEventData.json",
             data=full_json_str.encode("utf-8"),
             file_name="LiveEventData.json",
             mime="application/json",
+            disabled=has_errors,
             use_container_width=True,
+            key="liveevent_export_download",
         )
     with col_cp:
-        _copy_button(full_json_str, key="copy_full")
+        if not has_errors:
+            _copy_button(full_json_str)
+        else:
+            st.button("📋 Копировать в буфер", disabled=True, use_container_width=True)
 
     st.divider()
 
-    # ── Просмотр JSON с фильтрацией ─────────────────────────────────────────
-    st.subheader("🔍 Просмотр JSON")
+    # Предпросмотр с фильтром по событию
+    st.subheader("🔍 Предпросмотр JSON")
 
-    if n_events == 0:
-        st.info("Нет событий для отображения.")
-        return
-
-    # Собираем список EventID для selectbox
     event_ids = [
         e.get("PossibleNodeEventData", {}).get("EventID", f"[{i}]")
         for i, e in enumerate(events_raw)
@@ -87,7 +128,7 @@ def render_export_tab():
         )
     with col_btn:
         st.write("")  # выравнивание по высоте
-        show = st.button("👁️ Показать JSON", use_container_width=True)
+        show = st.button("👁️ Показать JSON", use_container_width=True, key="liveevent_export_show")
 
     if show:
         if selected_id == "— Весь конфиг —":
@@ -108,7 +149,6 @@ def render_export_tab():
         )
         st.session_state["export_preview_filename"] = filename_hint
 
-    # Отображаем сохранённый предпросмотр
     if "export_preview_json" in st.session_state:
         preview_str = st.session_state["export_preview_json"]
         filename_hint = st.session_state.get("export_preview_filename", "fragment.json")
@@ -127,4 +167,4 @@ def render_export_tab():
                 key="export_download_fragment",
             )
         with col_cp2:
-            _copy_button(preview_str, key="copy_fragment")
+            _copy_button(preview_str)
