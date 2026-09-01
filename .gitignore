@@ -10,3 +10,7 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+### Python
+# Скомпилированный байткод
+*.pyc

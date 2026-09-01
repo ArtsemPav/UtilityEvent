@@ -1,8 +1,14 @@
-﻿# LiveEvent JSON Builder — Документация
+# LiveEvent JSON Builder — Документация
+
+> Документ описывает фактическое состояние кода. Разделы
+> [«Неиспользуемый код»](#неиспользуемый-код) и [«Известные ограничения»](#известные-ограничения)
+> перечисляют места, где код расходится с ожиданиями или со спецификацией.
 
 ## Обзор приложения
 
-**LiveEvent JSON Builder** — Streamlit-приложение для создания, редактирования и экспорта конфигураций LiveEvent и SinglePick в формате JSON. Предназначено для управления игровыми событиями с поддержкой сегментации игроков, узлов прогрессии, целей и наград.
+**LiveEvent JSON Builder** — Streamlit-приложение для создания, редактирования и экспорта конфигураций
+**LiveEvent** и **SinglePick** в формате JSON. Две схемы независимы: у них разные корневые ключи,
+разные модели данных и разное состояние в `st.session_state`.
 
 ### Запуск
 
@@ -10,471 +16,609 @@
 streamlit run app.py
 ```
 
-Или через `StartApp.bat`.
+Или через [StartApp.bat](StartApp.bat) (`python3 -m streamlit run app.py`).
+
+### Зависимости
+
+Перечислены в [requirements.txt](requirements.txt):
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+| Пакет | Где используется |
+|---|---|
+| `streamlit` | всё приложение, включая `streamlit.components.v1` для кнопок «копировать в буфер» |
+| `jsonschema` | `services/json_io.py` — валидация по JSON Schema |
+| `pandas` | `ui/import_tab.py` — чтение CSV/Excel |
+| `openpyxl` | требуется `pandas.read_excel` для `.xlsx` (транзитивно) |
+
+`.devcontainer/devcontainer.json` доустанавливает `streamlit` и, при наличии, `requirements.txt`;
+приложение поднимается на порту 8501.
 
 ---
 
 ## Структура проекта
 
 ```
-app.py                        # Точка входа
-models/                       # Модели данных
-  base.py                     # Базовые абстрактные классы
-  event.py                    # Структура события (Event, Segment, Stage)
-  nodes.py                    # Типы узлов (ProgressNode, EntriesNode, DummyNode)
-  rewards.py                  # Типы наград
-  goals.py                    # Типы целей
-  minbet.py                   # Типы минимальных ставок
-  singlepick.py               # Структура SinglePick конфига
-services/                     # Бизнес-логика
-  state_manager.py            # Управление состоянием приложения (AppState)
-  json_io.py                  # Загрузка и сохранение JSON
-  builders.py                 # Фабричные функции для создания объектов
-  singlepick_validator.py     # Валидация SinglePick конфигов
-ui/                           # Пользовательский интерфейс
-  common.py                   # Общие UI-утилиты
-  import_tab.py               # Пакетный импорт из CSV/Excel
-  tabs/                       # Основные вкладки приложения
-    editor_tab.py             # Редактор LiveEvent
-    export_tab.py             # Экспорт LiveEvent
-    singlepick_tab.py         # Редактор SinglePick
-    singlepick_export_tab.py  # Экспорт SinglePick
-    validation_tab.py         # Валидация по JSON Schema
-  widgets/                    # Переиспользуемые виджеты
-    event_tree.py             # Дерево событий
-    node_editor.py            # Редактор узлов
-    minbet_widget.py          # Редактор MinBet
-    goal_widget.py            # Редактор целей
-    reward_widget.py          # Редактор одной награды
-    rewards_editor.py         # Редактор списка наград
-    singlepick_reward_widget.py      # Редактор SinglePick награды
-    singlepick_rewards_editor.py     # Редактор списка SinglePick наград
-utils/                        # Утилиты
-  constants.py                # Константы и дефолтные значения
-  helpers.py                  # Вспомогательные функции
-  validators.py               # Функции валидации данных
+app.py                              # Точка входа, 5 вкладок
+models/                             # Модели данных (dataclass + to_dict/from_dict)
+  base.py                           # Serializable (ABC)
+  event.py                          # Stage, Segment, PossibleNodeEventData, make_node_event
+  nodes.py                          # ProgressNode, EntriesNode, DummyNode, node_from_dict
+  rewards.py                        # 5 типов наград + обёртка Reward
+  goals.py                          # 6 типов параметров цели + обёртка Goal
+  minbet.py                         # FixedMinBet, VariableMinBet
+  singlepick.py                     # Полная иерархия SinglePick
+services/
+  state_manager.py                  # AppState — состояние вкладок LiveEvent
+  json_io.py                        # Загрузка/сохранение JSON, валидация по схеме
+  singlepick_validator.py           # Логическая валидация SinglePick
+  builders.py                       # Фабрики (НЕ используются, частичная заглушка)
+ui/
+  common.py                         # inject_sticky_right_column + неиспользуемые утилиты
+  import_tab.py                     # Пакетный импорт из CSV/Excel
+  tabs/
+    editor_tab.py                   # Редактор LiveEvent
+    export_tab.py                   # Экспорт LiveEvent
+    singlepick_tab.py               # Редактор SinglePick (+ своё состояние SinglePickState)
+    singlepick_export_tab.py        # Экспорт SinglePick
+    validation_tab.py               # Валидация по схеме (НЕ подключена в app.py)
+  widgets/
+    event_tree.py                   # Дерево событий LiveEvent
+    node_editor.py                  # Формы всех типов узлов + система снимков
+    minbet_widget.py                # Редактор MinBet
+    goal_widget.py                  # Редактор цели
+    reward_widget.py                # Редактор одной награды LiveEvent
+    rewards_editor.py               # Редактор списка наград LiveEvent
+    singlepick_reward_widget.py     # Редактор одной награды SinglePick
+    singlepick_rewards_editor.py    # Редактор списка наград SinglePick
+utils/
+  constants.py                      # Константы и дефолтные значения
+  helpers.py                        # Парсинг/форматирование строк
+  validators.py                     # Функции валидации (возвращают List[str])
+requirements.txt                    # Зависимости приложения
+.kiro/specs/singlepick-tab/         # Спецификация вкладки SinglePick (requirements/design/tasks)
+```
+
+---
+
+## Формат JSON
+
+### LiveEvent
+
+```json
+{
+  "Events": [
+    {
+      "PossibleNodeEventData": {
+        "EventID": "MyEvent",
+        "AssetBundlePath": "_events/MyEvent",
+        "BlockerPrefabPath": "Dialogs/MyEvent_Dialog",
+        "RoundelPrefabPath": "Roundels/MyEvent_Roundel",
+        "EventCardPrefabPath": "",
+        "NodeCompletionPrefabPath": "Dialogs/MyEvent_Dialog",
+        "ContentKey": "MyEvent",
+        "MinLevel": 1,
+        "NumberOfRepeats": -1,
+        "IsRoundelHidden": false,
+        "ShowRoundelOnAllMachines": false,
+        "IsPrizePursuit": false,
+        "UseNodeFailedNotification": false,
+        "UseForceLandscapeOnWeb": false,
+        "IsCurrencyEvent": false,
+        "StartingEventCurrency": 0.0,
+        "TimeWarning": "2026-10-01T00:00:00Z",
+        "EntryTypes": [],
+        "Segment": "Default",
+        "Segments": {
+          "VIP1_10": {
+            "Stages": [
+              {
+                "StageID": 1,
+                "Nodes": [
+                  {
+                    "ProgressNode": {
+                      "NodeID": 1,
+                      "NextNodeID": [2],
+                      "GameList": ["AllGames"],
+                      "MinBet": { "FixedMinBet": { "MinBet": 250000.0 } },
+                      "Goal": { "Type": ["Spins"], "FixedGoal": { "Target": 20 } },
+                      "Rewards": [{ "FixedReward": { "Currency": "Chips", "Amount": 2500000.0 } }],
+                      "IsLastNode": false,
+                      "ResegmentFlag": false,
+                      "MiniGame": "FlatReward",
+                      "ContributionLevel": "Node",
+                      "ButtonActionType": "",
+                      "ButtonActionData": "",
+                      "ButtonActionText": "PLAY NOW!",
+                      "CustomTexts": [],
+                      "HideLoadingScreenForReward": false,
+                      "PossibleItemCollect": "Default"
+                    }
+                  }
+                ]
+              }
+            ],
+            "PossibleSegmentInfo": { "VIPRange": "1-10+" }
+          }
+        }
+      }
+    }
+  ],
+  "IsFallbackConfig": false
+}
+```
+
+### SinglePick
+
+```json
+{
+  "ConfigSets": {
+    "MyConfigSet": {
+      "Pickers": {
+        "Picks": [
+          { "RewardPick": { "Reward": [{ "FixedReward": { "Currency": "Chips", "Amount": 1000000 } }], "Weight": 1, "PossibleMax": 1 } },
+          { "JackpotPick": { "CIJackpot": { "Min": 0, "Max": 0, "CIMin": 0, "CIMax": 0 }, "Weight": 0, "PossibleMax": 0 } },
+          { "RetryPick": { "Reward": [], "Weight": 0, "PossibleMax": 0 } }
+        ],
+        "TotalPickOnBoard": 1,
+        "PickUntilWin": 0
+      }
+    },
+    "MyWheel": {
+      "Wheel": {
+        "Wedges": [
+          { "RewardPick": { "Reward": [{ "FixedReward": { "Currency": "Chips", "Amount": 1000000 } }], "Weight": 1 } }
+        ]
+      }
+    }
+  }
+}
 ```
 
 ---
 
 ## app.py — Точка входа
 
-Инициализирует Streamlit-приложение и создаёт 5 основных вкладок:
+Настраивает страницу (`layout="wide"`), получает `AppState.get_instance()` и, если событий больше нуля,
+а текущий индекс равен `-1`, выставляет `current_event_idx = 0`. Затем создаёт 5 вкладок:
 
-| Вкладка | Описание |
-|---------|----------|
-| ✏️ Редактор LiveEvent | Создание и редактирование событий |
-| 💾 Экспорт LiveEvent | Скачивание и предпросмотр JSON |
-| 🎰 Редактор SinglePick | Управление конфигами SinglePick |
-| 📤 Экспорт SinglePick | Экспорт SinglePick конфигов |
-| ⚙️ Настройки | Переключение расширенных параметров |
+| Вкладка | Функция рендера |
+|---|---|
+| ✏️ Редактор LiveEvent | `render_editor_tab()` |
+| 💾 Экспорт LiveEvent | `render_export_tab()` |
+| 🎰 Редактор SinglePick | `render_singlepick_tab()` |
+| 📤 Экспорт SinglePick | `render_singlepick_export_tab()` |
+| ⚙️ Настройки | инлайн: `st.toggle("🔧 Расширенные параметры", key="show_advanced")` |
 
-Использует `AppState.get_instance()` для получения синглтона состояния приложения.
+Все функции рендера вызываются **без аргументов** — состояние они получают сами
+(`AppState.get_instance()` / `get_singlepick_state()`).
+
+Флаг `st.session_state["show_advanced"]` читают формы события и узлов, скрывая под ним редкие поля.
 
 ---
+
 ## Модели данных (models/)
 
 ### models/base.py
 
-Базовые абстрактные классы для всех объектов данных.
-
-**Класс `Serializable` (ABC)**
-
-Абстрактный базовый класс, от которого наследуются все модели.
+**Класс `Serializable` (ABC)** — базовый класс всех моделей.
 
 | Метод | Описание |
-|-------|----------|
-| `to_dict() -> dict` | Сериализация объекта в словарь для JSON |
-| `from_dict(data: dict)` | Десериализация объекта из словаря |
+|---|---|
+| `to_dict() -> dict` | Сериализация в словарь для JSON |
+| `from_dict(data: dict)` | Классметод десериализации |
+
+> `Segment.from_dict(name, data)` принимает два аргумента и не соответствует сигнатуре базового класса.
 
 ---
 
 ### models/event.py
 
-Структуры данных для описания игрового события.
+**`get_default_time_warning() -> str`** — `datetime.utcnow() + 30 дней` в формате `"%Y-%m-%dT%H:%M:%SZ"`.
 
-**Класс `Stage`**
+**Класс `Stage`** → `{"StageID": ..., "Nodes": [...]}`
 
-Стадия события, содержащая список узлов.
+| Поле | Тип | По умолчанию |
+|---|---|---|
+| `stage_id` | `int` | — |
+| `nodes` | `List[Node]` | `[]` |
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `stage_id` | `int` | Идентификатор стадии |
-| `nodes` | `List[Node]` | Список узлов в стадии |
+**Класс `Segment`** → `{<name>: {"Stages": [...], "PossibleSegmentInfo": {<type>: <value>}}}`
 
-**Класс `Segment`**
+| Поле | Тип | По умолчанию |
+|---|---|---|
+| `name` | `str` | — |
+| `segment_info_type` | `str` | `"VIPRange"` |
+| `segment_info_value` | `str` | `"1-10+"` |
+| `stages` | `List[Stage]` | `[Stage(stage_id=1)]` |
 
-Сегмент события — группа игроков с определёнными характеристиками.
+- Допустимые типы: `VIPRange`, `AverageWagerRange`, `SpinpadRange`, `LevelRange` или `""` (нет инфо).
+- `PossibleSegmentInfo` попадает в JSON **только если** и тип, и значение непусты.
+- Свойство `vip_range` — обратная совместимость: возвращает значение, если тип `VIPRange`, иначе `""`.
+- `from_dict(name, data)` ожидает `data` вида `{name: inner}`.
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `name` | `str` | Имя сегмента |
-| `segment_info_type` | `str` | Тип сегментации: `VIPRange`, `AverageWagerRange`, `SpinpadRange`, `LevelRange` |
-| `segment_info_value` | `str` | Значение диапазона, например `"1-10+"` |
-| `stages` | `List[Stage]` | Список стадий в сегменте |
+**Класс `PossibleNodeEventData`** → `{"PossibleNodeEventData": {...}}`
 
-**Класс `PossibleNodeEventData`**
+| Поле | Ключ JSON | Тип | Дефолт при `from_dict` |
+|---|---|---|---|
+| `event_id` | `EventID` | `str` | `"MyEvent"` |
+| `min_level` | `MinLevel` | `int` | `1` |
+| `segment` | `Segment` | `str` | `"Default"` |
+| `asset_bundle_path` | `AssetBundlePath` | `str` | `"_events/MyEvent"` |
+| `blocker_prefab_path` | `BlockerPrefabPath` | `str` | `"Dialogs/MyEvent_Dialog"` |
+| `roundel_prefab_path` | `RoundelPrefabPath` | `str` | `"Roundels/MyEvent_Roundel"` |
+| `event_card_prefab_path` | `EventCardPrefabPath` | `str` | `""` |
+| `node_completion_prefab_path` | `NodeCompletionPrefabPath` | `str` | `"Dialogs/MyEvent_Dialog"` |
+| `content_key` | `ContentKey` | `str` | `"MyEvent"` |
+| `number_of_repeats` | `NumberOfRepeats` | `int` | `-1` (бесконечно) |
+| `entry_types` | `EntryTypes` | `List[str]` | `[]` |
+| `segments` | `Segments` | `Dict[str, Segment]` | `{}` |
+| `is_roundel_hidden` | `IsRoundelHidden` | `bool` | `False` |
+| `use_node_failed_notification` | `UseNodeFailedNotification` | `bool` | `False` |
+| `is_prize_pursuit` | `IsPrizePursuit` | `bool` | `False` |
+| `use_force_landscape_on_web` | `UseForceLandscapeOnWeb` | `bool` | `False` |
+| `show_roundel_on_all_machines` | `ShowRoundelOnAllMachines` | `bool` | `False` |
+| `starting_event_currency` | `StartingEventCurrency` | `float` | `0.0` |
+| `is_currency_event` | `IsCurrencyEvent` | `bool` | `False` |
+| `time_warning` | `TimeWarning` | `str` | `get_default_time_warning()` |
 
-Основная структура события.
+Три последних поля — «скрытые»: в UI доступны только при включённом тумблере «Расширенные параметры».
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `event_id` | `str` | Уникальный идентификатор события |
-| `min_level` | `int` | Минимальный уровень игрока |
-| `segment` | `str` | Основной сегмент |
-| `asset_bundle_path` | `str` | Путь к ассет-бандлу |
-| `blocker_prefab_path` | `str` | Путь к префабу блокера |
-| `roundel_prefab_path` | `str` | Путь к префабу раундела |
-| `content_key` | `str` | Ключ контента |
-| `number_of_repeats` | `int` | Количество повторений (-1 = бесконечно) |
-| `entry_types` | `List[str]` | Типы входов |
-| `segments` | `Dict[str, Segment]` | Словарь сегментов |
-| `is_roundel_hidden` | `bool` | Скрыть раундел |
-| `use_node_failed_notification` | `bool` | Уведомление о провале узла |
-| `is_prize_pursuit` | `bool` | Режим Prize Pursuit |
-| `use_force_landscape_on_web` | `bool` | Принудительный ландшафтный режим |
-| `show_roundel_on_all_machines` | `bool` | Показывать раундел на всех машинах |
-| `starting_event_currency` | `float` | Начальная валюта события |
-| `is_currency_event` | `bool` | Является ли событие валютным |
-| `time_warning` | `str` | Время предупреждения в формате ISO 8601 |
+**`make_node_event(...) -> PossibleNodeEventData`** — фабрика, которую использует редактор.
+Принимает все поля события; `segments` по умолчанию `None` → `{}`, `time_warning=None` → дефолт.
 
 ---
 
 ### models/nodes.py
 
-Типы узлов прогрессии события.
+`Node = Union[ProgressNode, EntriesNode, DummyNode]`.
+**`node_from_dict(data)`** выбирает класс по корневому ключу и бросает `ValueError` для неизвестного типа.
 
-**Класс `ProgressNode`**
+**Класс `ProgressNode`** → `{"ProgressNode": {...}}`
 
-Основной узел прогрессии — игрок выполняет цель и получает награду.
+| Поле | Ключ JSON | Тип | Дефолт |
+|---|---|---|---|
+| `node_id` | `NodeID` | `int` | — |
+| `next_node_ids` | `NextNodeID` | `List[int]` | — |
+| `game_list` | `GameList` | `List[str]` | — |
+| `min_bet` | `MinBet` | `FixedMinBet \| VariableMinBet` | — |
+| `goal` | `Goal` | `Goal` | — |
+| `rewards` | `Rewards` | `List[Reward]` | — |
+| `is_last_node` | `IsLastNode` | `bool` | `False` |
+| `resegment_flag` | `ResegmentFlag` | `bool` | `False` |
+| `mini_game` | `MiniGame` | `str` | `"FlatReward"` |
+| `contribution_level` | `ContributionLevel` | `str` | `"Node"` |
+| `button_action_type` | `ButtonActionType` | `str` | `""` |
+| `button_action_data` | `ButtonActionData` | `str` | `""` |
+| `button_action_text` | `ButtonActionText` | `str` | `"PLAY NOW!"` |
+| `custom_texts` | `CustomTexts` | `List[str]` | `[]` |
+| `possible_item_collect` | `PossibleItemCollect` | `str` | `""` — **пишется только если непусто** |
+| `hide_loading_screen` | `HideLoadingScreenForReward` | `bool` | `False` |
+| `prize_box_index` | `PrizeBoxIndex` | `int` | `-1` — **пишется только если `> 0`** |
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `node_id` | `int` | Уникальный ID узла |
-| `next_node_ids` | `List[int]` | IDs следующих узлов |
-| `game_list` | `List[str]` | Список игр для этого узла |
-| `min_bet` | `FixedMinBet \| VariableMinBet` | Минимальная ставка |
-| `goal` | `Goal` | Цель узла |
-| `rewards` | `List[Reward]` | Список наград |
-| `is_last_node` | `bool` | Является ли узел последним |
-| `mini_game` | `str` | Тип мини-игры (например, `FlatReward`) |
-| `button_action_text` | `str` | Текст кнопки действия |
-| `button_action_type` | `str` | Тип действия кнопки |
-| `button_action_data` | `str` | Данные действия кнопки |
-| `custom_texts` | `List[str]` | Пользовательские тексты |
-| `possible_item_collect` | `str` | Возможный предмет для сбора |
-| `hide_loading_screen` | `bool` | Скрыть экран загрузки |
-| `prize_box_index` | `int` | Индекс коробки с призом |
+**Класс `EntriesNode`** → `{"EntriesNode": {...}}`
 
-**Класс `EntriesNode`**
+| Поле | Ключ JSON | Тип | Дефолт |
+|---|---|---|---|
+| `node_id` | `NodeID` | `int` | — |
+| `game_list` | `GameList` | `List[str]` | — |
+| `min_bet` | `MinBet` | `FixedMinBet \| VariableMinBet` | — |
+| `goal_types` | `GoalType` | `List[str]` | — |
+| `entry_types` | `EntryTypes` | `List[str]` | — |
+| `resegment_flag` | `ResegmentFlag` | `bool` | `False` |
+| `button_action_type/data/text` | `ButtonAction*` | `str` | `""` / `""` / `"PLAY NOW!"` |
+| `custom_texts` | `CustomTexts` | `List[str]` | `[]` |
+| `possible_item_collect` | `PossibleItemCollect` | `str` | `"Default"` — пишется всегда |
+| `prize_box_index` | `PrizeBoxIndex` | `int` | `-1` — **пишется только если `> 0`** |
 
-Узел сбора входов.
+У `EntriesNode` нет `Goal`, `Rewards`, `NextNodeID` и `IsLastNode`.
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `node_id` | `int` | Уникальный ID узла |
-| `game_list` | `List[str]` | Список игр |
-| `min_bet` | `FixedMinBet \| VariableMinBet` | Минимальная ставка |
-| `goal_types` | `List[str]` | Типы целей |
-| `entry_types` | `List[str]` | Типы входов |
-| `button_action_text/type/data` | `str` | Параметры кнопки |
+**Класс `DummyNode`** → `{"DummyNode": {...}}`
 
-**Класс `DummyNode`**
-
-Фиктивный узел для ветвления и выбора.
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `node_id` | `int` | Уникальный ID узла |
-| `next_node_ids` | `List[int]` | IDs следующих узлов |
-| `default_node_id` | `int` | ID узла по умолчанию |
-| `rewards` | `List[Reward]` | Награды |
-| `is_choice_event` | `bool` | Является ли событием выбора |
-
-**Функция `node_from_dict(data: dict) -> Node`**
-
-Фабрика для создания узла нужного типа на основе данных словаря.
+| Поле | Ключ JSON | Тип | Дефолт |
+|---|---|---|---|
+| `node_id` | `NodeID` | `int` | — |
+| `next_node_ids` | `NextNodeID` | `List[int]` | `[11, 21, 31]` при `from_dict` |
+| `default_node_id` | `DefaultNodeID` | `int` | — |
+| `rewards` | `Rewards` | `List[Reward]` | — |
+| `is_last_node` | `IsLastNode` | `bool` | `False` |
+| `resegment_flag` | `ResegmentFlag` | `bool` | `False` |
+| `mini_game` | `MiniGame` | `str` | `"FlatReward"` |
+| `contribution_level` | `ContributionLevel` | `str` | `"Node"` |
+| `button_action_type/data/text` | `ButtonAction*` | `str` | `""` |
+| `custom_texts` | `CustomTexts` | `List[str]` | `[]` |
+| `is_choice_event` | `IsChoiceEvent` | `bool` | `True` |
+| `hide_loading_screen` | `HideLoadingScreenForReward` | `bool` | `False` |
+| `prize_box_index` | `PrizeBoxIndex` | `int` | `-1` — **пишется только если `> 0`** |
 
 ---
 
 ### models/rewards.py
 
-Типы наград для узлов.
+`RewardType = Union[FixedReward, RtpReward, FreeplayUnlockReward, CollectableSellPacksReward, CollectableMagicPacksReward]`
 
-| Класс | Поля | Описание |
-|-------|------|----------|
-| `FixedReward` | `currency: str`, `amount: float` | Фиксированная награда в валюте |
-| `RtpReward` | `currency: str`, `percentage: float`, `min: float`, `max: float` | Награда на основе RTP |
-| `FreeplayUnlockReward` | `game_name: str`, `spins: int` | Разблокировка фриспинов |
-| `CollectableSellPacksReward` | `pack_id: str`, `num_packs: int` | Награда пакетами для продажи |
-| `CollectableMagicPacksReward` | `pack_id: str`, `num_packs: int` | Магические пакеты |
+| Класс | Поля | JSON |
+|---|---|---|
+| `FixedReward` | `currency: str`, `amount: float` | `{"FixedReward": {"Currency", "Amount"}}` |
+| `RtpReward` | `currency: str`, `percentage: float`, `min: float`, `max: float` | `{"RtpReward": {"Currency", "Percentage", "Min", "Max"}}` |
+| `FreeplayUnlockReward` | `game_name: str`, `spins: int` | `{"FreeplayUnlockReward": {"GameName", "Spins"}}` |
+| `CollectableSellPacksReward` | `pack_id: str`, `num_packs: int` | `{"CollectableSellPacksReward": {"PackId", "NumPacks"}}` |
+| `CollectableMagicPacksReward` | `pack_id: str`, `num_packs: int` | `{"CollectableMagicPacksReward": {"PackId", "NumPacks"}}` |
 
-**Класс `Reward`**
-
-Обёртка для любого типа награды.
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `data` | `RewardType` | Конкретный объект награды |
+**Класс `Reward`** — обёртка с единственным полем `data: RewardType`.
+`to_dict()` делегирует вложенному объекту (лишнего уровня не добавляет),
+`from_dict()` определяет тип по ключу; при неизвестном ключе — фолбэк `FixedReward(Chips, 0.0)`.
 
 ---
 
 ### models/goals.py
 
-Типы целей для узлов.
-
-| Класс | Поля | Описание |
-|-------|------|----------|
-| `FixedGoal` | `target: int` | Фиксированное целевое значение |
-| `SpinpadGoal` | `multiplier: float`, `min: int`, `max: int` | Цель на основе спинпада |
-| `ConsecutiveWinsGoal` | `number_of_streaks_target: int`, `multiplier: float`, `min: int`, `max: int` | Цель на серии побед |
-| `TotalCoinsPerDayGoal` | `multiplier: float`, `min: int`, `max: int` | Общие монеты в день |
-| `TotalCoinsPerDayWithSpinLimiterGoal` | `spin_limiter: int`, `multiplier: float`, `min: int`, `max: int` | Монеты в день с лимитом спинов |
-| `FixedGoalWithSpinLimiterGoal` | `target: int`, `spin_limiter: int` | Фиксированная цель с лимитом спинов |
+| Класс | Поля | Корневой ключ JSON |
+|---|---|---|
+| `FixedGoal` | `target: int` | `FixedGoal` → `{"Target"}` |
+| `SpinpadGoal` | `multiplier: float`, `min: int`, `max: int` | `SpinpadGoal` → `{"Multiplier", "Min", "Max"}` |
+| `ConsecutiveWinsGoal` | `number_of_streaks_target: int`, `multiplier: float`, `min: int`, `max: int` | `ConsecutiveWinsGoal` → `{"NumberOfStreaksTarget", "WinsInStreakSpinPadGoal": {"Multiplier", "Min", "Max"}}` |
+| `TotalCoinsPerDayGoal` | `multiplier: float`, `min: int`, `max: int` | `TotalCoinsPerDay` → `{"Multiplier", "Min", "Max"}` |
+| `TotalCoinsPerDayWithSpinLimiterGoal` | `spin_limiter: int`, `multiplier: float`, `min: int`, `max: int` | `TotalCoinsPerDayWithSpinLimiter` |
+| `FixedGoalWithSpinLimiterGoal` | `target: int`, `spin_limiter: int` | `FixedGoalWithSpinLimiter` |
 
 **Класс `Goal`**
 
-Обёртка для цели узла.
-
 | Поле | Тип | Описание |
-|------|-----|----------|
-| `type` | `List[str]` | Тип цели: `Spins`, `Coins`, `Wins` и др. |
-| `params` | `GoalParams` | Конкретные параметры цели |
+|---|---|---|
+| `type` | `List[str]` | Значение ключа `Type`, например `["Spins"]` |
+| `params` | `GoalParams` | Один из шести классов выше |
+
+`to_dict()` возвращает **плоский** словарь: `{"Type": [...], "<ИмяПараметров>": {...}}`.
+`from_dict()` берёт `Type`, а тип параметров определяет по остальным ключам; фолбэк — `FixedGoal(target=20)`.
 
 ---
 
 ### models/minbet.py
 
-Типы минимальных ставок.
+| Класс | Поля | JSON |
+|---|---|---|
+| `FixedMinBet` | `amount: float` | `{"FixedMinBet": {"MinBet": ...}}` |
+| `VariableMinBet` | `variable: float`, `min: float`, `max: float` | `{"MinBetVariable": {"Variable", "Min", "Max"}}` |
 
-| Класс | Поля | Описание |
-|-------|------|----------|
-| `FixedMinBet` | `amount: float` | Фиксированная ставка |
-| `VariableMinBet` | `variable: float`, `min: float`, `max: float` | Переменная ставка с диапазоном |
+Выбор класса при разборе: если в словаре есть ключ `FixedMinBet` — `FixedMinBet`, иначе `VariableMinBet`.
 
 ---
 
 ### models/singlepick.py
 
-Структуры данных для конфигурации SinglePick (пикеры и колесо).
+**Награды** — `SPReward = Union[FixedSPReward, RtpSPReward, PurchaseSPReward, FreeplaySPReward, PacksSPReward]`
 
-**Типы наград SinglePick:**
+| Класс | Поля | JSON |
+|---|---|---|
+| `FixedSPReward` | `currency: str`, `amount: int` | `{"FixedReward": {"Currency", "Amount"}}` |
+| `RtpSPReward` | `currency: str`, `percentage: float`, `min: int`, `max: int` | `{"RtpReward": {...}}` |
+| `PurchaseSPReward` | `shop_type: str`, `shop_name: str` | `{"PurchaseReward": {"ShopType", "ShopName"}}` |
+| `FreeplaySPReward` | `game_name: str`, `spins: int` | `{"FreeplayUnlockReward": {...}}` |
+| `PacksSPReward` | `pack_id: str`, `num_packs: int` | `{"CollectableSellPacksReward": {...}}` |
 
-| Класс | Описание |
-|-------|----------|
-| `FixedSPReward` | Фиксированная награда |
-| `RtpSPReward` | Награда на основе RTP |
-| `PurchaseSPReward` | Награда за покупку |
-| `FreeplaySPReward` | Фриспины |
-| `PacksSPReward` | Пакеты |
+`_sp_reward_from_dict(data)` — диспетчер по ключу, фолбэк `FixedSPReward(Chips, 0)`.
 
-**Типы джекпотов:**
+**Джекпоты**
 
-| Класс | Описание |
-|-------|----------|
-| `FixedJackpot` | Фиксированный джекпот |
-| `CIJackpot` | CI-джекпот |
+| Класс | Поля | JSON |
+|---|---|---|
+| `FixedJackpot` | `min`, `max` | `{"FixedJackpot": {"Min", "Max"}}` |
+| `CIJackpot` | `min`, `max`, `ci_min`, `ci_max` | `{"CIJackpot": {"Min", "Max", "CIMin", "CIMax"}}` |
 
-**Типы пиков:**
+`_jackpot_from_dict(data)`: ключ `CIJackpot` → `CIJackpot`, иначе `FixedJackpot`.
 
-| Класс | Описание |
-|-------|----------|
-| `RewardPick` | Пик с наградой |
-| `JackpotPick` | Пик с джекпотом |
-| `RetryPick` | Пик повтора |
+**Пики** — `Pick = Union[RewardPick, JackpotPick, RetryPick]`, диспетчер `_pick_from_dict`.
 
-**Класс `Wedge`** — сектор колеса (содержит награды и вес).
+| Класс | Поля | Особенности сериализации |
+|---|---|---|
+| `RewardPick` | `reward: list`, `weight: int`, `possible_max: int` | `{"RewardPick": {"Reward": [...], "Weight", "PossibleMax"}}` |
+| `JackpotPick` | `jackpot`, `weight`, `possible_max` | Словарь джекпота **встраивается** внутрь `JackpotPick` рядом с `Weight`/`PossibleMax` |
+| `RetryPick` | `reward: list`, `weight: int`, `possible_max: int` | Как `RewardPick`; список наград может быть пустым |
 
-**Класс `PickersConfig`**
+**Класс `Wedge`** (`reward: list`, `weight: int`) — сектор колеса.
+Сериализуется под ключом **`RewardPick`**, но **без** `PossibleMax`.
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `picks` | `list` | Список пиков |
-| `total_pick_on_board` | `int` | Всего пиков на доске |
-| `pick_until_win` | `int` | Количество пиков до победы |
+**Контейнеры**
 
-**Класс `WheelConfig`**
+| Класс | Поля | JSON |
+|---|---|---|
+| `PickersConfig` | `picks: list`, `total_pick_on_board: int`, `pick_until_win: int` | `{"Picks", "TotalPickOnBoard", "PickUntilWin"}` |
+| `WheelConfig` | `wedges: list` | `{"Wedges": [...]}` |
+| `ConfigSet` | `content: PickersConfig \| WheelConfig` | `{"Pickers": {...}}` либо `{"Wheel": {...}}` |
+| `SinglePickConfig` | `config_sets: dict` | `{"ConfigSets": {name: {...}}}` |
 
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `wedges` | `list` | Список секторов колеса |
-
-**Класс `ConfigSet`** — набор конфигов (Pickers или Wheel).
-
-**Класс `SinglePickConfig`**
-
-| Поле | Тип | Описание |
-|------|-----|----------|
-| `config_sets` | `dict` | Словарь наборов конфигов |
+`SinglePickConfig.from_dict()` бросает `ValueError("Missing 'ConfigSets' key")`, если корневого ключа нет —
+на этом редактор отличает SinglePick-файл от постороннего.
 
 ---
+
 ## Сервисы (services/)
 
 ### services/state_manager.py
 
-Управление состоянием приложения через синглтон `AppState`, хранящийся в `st.session_state`.
+**Класс `AppState`** — состояние вкладок LiveEvent. Экземпляр лежит в `st.session_state["app_state"]`.
 
-**Класс `AppState`**
+Поля: `cfg`, `current_event_idx` (`-1` = не выбрано), `current_segment_name`, `editing_context`,
+`temp_data`, `_event_cache`, `staged_cfg`, `staged_event_idx`.
 
-#### Инициализация
-
-| Метод | Описание |
-|-------|----------|
-| `get_instance() -> AppState` | Получить или создать экземпляр AppState |
-
-#### Работа с конфигом
+#### Инициализация и конфиг
 
 | Метод | Описание |
-|-------|----------|
-| `get_cfg() -> dict` | Получить текущий конфиг |
-| `set_cfg(cfg: dict)` | Установить конфиг |
-| `get_events_raw() -> list` | Получить список событий из конфига |
-| `get_event_by_index(idx: int) -> dict` | Получить событие по индексу (с кэшированием) |
-| `update_event(idx: int, event: dict)` | Обновить событие по индексу |
-| `add_event(event: dict)` | Добавить новое событие |
-| `delete_event(idx: int)` | Удалить событие по индексу |
+|---|---|
+| `get_instance()` | Классметод: достаёт или создаёт экземпляр в `session_state` |
+| `get_cfg() -> dict` | Текущий рабочий конфиг |
+| `set_cfg(cfg)` | Заменяет конфиг и **сбрасывает кэш событий** |
+| `get_events_raw() -> List[dict]` | `cfg["Events"]` как сырые словари |
+| `get_event_by_index(idx) -> PossibleNodeEventData \| None` | Десериализует событие с кэшированием в `_event_cache` |
+| `update_event(idx, event: PossibleNodeEventData)` | Пишет `event.to_dict()` в конфиг и инвалидирует кэш |
+| `add_event(event)` | Добавляет в конец, делает событие текущим, сбрасывает имя сегмента |
+| `delete_event(idx)` | Удаляет, пересчитывает индексы кэша и `current_event_idx`, при необходимости `clear_editing()` |
 
-#### Работа с сегментами
+#### Текущий выбор
 
-| Метод | Описание |
-|-------|----------|
-| `add_segment(event_idx, segment)` | Добавить сегмент в событие |
-| `update_segment(event_idx, seg_name, segment)` | Обновить сегмент |
-| `delete_segment(event_idx, seg_name)` | Удалить сегмент |
-| `get_current_segment() -> Segment` | Получить текущий выбранный сегмент |
+`get_current_event_idx()`, `set_current_event_idx(idx)` (сбрасывает имя сегмента),
+`get_current_event()`, `get_current_segment_name()`, `set_current_segment_name(name)`,
+`get_current_segment() -> Segment | None`.
 
-#### Работа с узлами
+#### Сегменты
 
 | Метод | Описание |
-|-------|----------|
-| `add_node_to_current_segment(node)` | Добавить узел в текущий сегмент |
-| `update_node_in_current_segment(node_idx, node)` | Обновить узел |
-| `delete_node_from_current_segment(node_idx)` | Удалить узел |
+|---|---|
+| `add_segment(event_idx, segment)` | Добавляет и делает текущим (если событие текущее) |
+| `update_segment(event_idx, old_name, new_segment)` | Удаляет старый ключ, добавляет новый, синхронизирует `current_segment_name` |
+| `delete_segment(event_idx, segment_name)` | Удаляет сегмент |
+
+#### Узлы
+
+| Метод | Описание |
+|---|---|
+| `_ensure_stage_exists(segment, stage_idx=0)` | Создаёт отсутствующие стадии (`stage_id` = индекс + 1) |
+| `add_node_to_current_segment(node)` | Всегда добавляет в **стадию 0** |
+| `update_node_in_current_segment(stage_idx, node_idx, node)` | Замена узла в текущем сегменте |
+| `delete_node_from_current_segment(stage_idx, node_idx)` | Удаление из текущего сегмента |
+| `delete_node(event_idx, seg_name, stage_idx, node_idx)` | Удаление по полным координатам (используется деревом) |
 
 #### Дублирование
 
 | Метод | Описание |
-|-------|----------|
-| `duplicate_event(idx: int)` | Создать копию события с суффиксом `_copy` |
-| `duplicate_segment(event_idx, seg_name)` | Дублировать сегмент |
-| `duplicate_node(event_idx, seg_name, stage_idx, node_idx)` | Дублировать узел |
+|---|---|
+| `duplicate_event(idx)` | Вставляет копию после оригинала, `EventID` → `_copy` / `_copy2` / … |
+| `duplicate_segment(event_idx, seg_name)` | Копия с именем `_copy` / `_copy2` / … |
+| `duplicate_node(event_idx, seg_name, stage_idx, node_idx)` | Копия сразу после оригинала (через `to_dict` → `node_from_dict`) |
 
 #### Контекст редактирования
 
-| Метод | Описание |
-|-------|----------|
-| `start_editing_event(idx)` | Начать редактирование события |
-| `start_editing_segment(event_idx, seg_name)` | Начать редактирование сегмента |
-| `start_editing_node(event_idx, seg_name, stage_idx, node_idx)` | Начать редактирование узла |
-| `apply_editing()` | Применить изменения из контекста редактирования |
-| `clear_editing()` | Отменить редактирование |
-| `get_editing_context() -> dict` | Получить текущий контекст редактирования |
-
-#### Staged-конфиг (для больших файлов)
+Редактирование идёт по глубокой копии; `editing_context` — словарь с ключом `type`
+(`"event"` / `"segment"` / `"node"`), координатами и объектом `copy`.
 
 | Метод | Описание |
-|-------|----------|
-| `set_staged_cfg(cfg: dict)` | Сохранить исходный большой конфиг |
-| `load_staged_event(event_id: str)` | Загрузить одно событие из staged конфига |
-| `apply_event_to_staged(event_id: str, event: dict)` | Применить изменения события обратно в staged |
-| `get_staged_cfg_with_patch() -> dict` | Получить staged конфиг с патчем текущего события |
+|---|---|
+| `start_editing_event(idx)` | Кладёт копию события, делает его текущим |
+| `start_editing_segment(event_idx, seg_name)` | Кладёт копию сегмента, выставляет текущее событие и сегмент |
+| `start_editing_node(event_idx, seg_name, stage_idx, node_idx)` | Кладёт копию узла; при `KeyError`/`IndexError` тихо ничего не делает |
+| `clear_editing()` | Сбрасывает контекст и удаляет из `session_state` все ключи `_node_loaded_id_*` и `_node_snapshot_*` |
+| `get_editing_context() -> dict \| None` | Текущий контекст |
+| `is_editing(edit_type=None) -> bool` | Идёт ли редактирование (опционально — заданного типа) |
+| `get_editing_event_copy()` | `PossibleNodeEventData` или `None` |
+| `get_editing_segment_copy()` | `(event_idx, name, Segment)` или `None` |
+| `get_editing_node_copy()` | `(event_idx, seg_name, stage_idx, node_idx, Node)` или `None` |
+| `apply_editing()` | Переносит копию в реальные данные (для сегмента корректно обрабатывает переименование) и вызывает `clear_editing()` |
+
+#### Staged-конфиг
+
+| Метод | Описание |
+|---|---|
+| `set_staged_cfg(cfg)` | Сохраняет исходный большой конфиг, `staged_event_idx = -1` |
+| `get_staged_cfg() -> dict \| None` | Исходный конфиг |
+| `get_staged_event_ids() -> List[str]` | Список `EventID` (при отсутствии — `[i]`) |
+| `load_staged_event(event_idx: int)` | Кладёт в рабочий конфиг **одно** событие, `current_event_idx = 0`, `clear_editing()` |
+| `apply_event_to_staged() -> bool` | Возвращает отредактированное событие в исходный конфиг |
+| `get_staged_cfg_with_patch() -> dict \| None` | Копия исходного конфига с наложенным текущим событием |
+| `clear_staged()` | Сбрасывает staged-режим |
+| `add_new_event_to_staged(event)` | Добавляет новое событие в staged (создав его при необходимости) и открывает в редакторе |
+
+Индекс события передаётся числом, а не `event_id`; вкладка получает индекс через `event_ids.index(...)`.
+
+#### Временные данные
+
+`set_temp(key, value)`, `get_temp(key, default=None)`, `clear_temp()` — заготовка, в UI не используется.
 
 ---
 
 ### services/json_io.py
 
-Функции для работы с JSON-файлами.
-
-| Функция | Параметры | Возвращает | Описание |
-|---------|-----------|------------|----------|
-| `load_config_from_json(file_content: bytes) -> dict` | Байты файла | Словарь конфига | Загружает конфиг из байтов, поддерживает кодировки utf-8, utf-8-sig, cp1251 |
-| `save_config_to_json(cfg: dict) -> bytes` | Словарь конфига | Байты JSON | Сохраняет конфиг в красиво отформатированный JSON |
-| `save_config_to_json_compact(cfg: dict) -> bytes` | Словарь конфига | Байты JSON | Сохраняет конфиг в компактный JSON без отступов |
-| `validate_config(cfg: dict, schema: dict) -> Tuple[bool, str]` | Конфиг и схема | `(is_valid, error_message)` | Валидирует конфиг по JSON Schema |
-
----
-
-### services/builders.py
-
-Фабричные функции для удобного создания объектов моделей.
-
-#### MinBet
-
 | Функция | Описание |
-|---------|----------|
-| `build_fixed_minbet(amount: float) -> FixedMinBet` | Создать фиксированную ставку |
-| `build_variable_minbet(variable, min, max) -> VariableMinBet` | Создать переменную ставку |
+|---|---|
+| `load_config_from_json(file_content: bytes) -> dict` | Декодирует, перебирая `utf-8`, `utf-8-sig`, `cp1251`, `latin-1`; парсит JSON; гарантирует ключи `Events` и `IsFallbackConfig` через `setdefault` |
+| `save_config_to_json(cfg) -> bytes` | `json.dumps(..., ensure_ascii=False, indent=4)` в UTF-8 |
+| `save_config_to_json_compact(cfg) -> bytes` | Компактный дамп без отступов (в UI не вызывается) |
+| `validate_config(cfg, schema: Optional[dict]) -> Tuple[bool, str]` | JSON Schema через `jsonschema`. **Если `schema is None`, возвращает `(False, "Схема не загружена")`** |
 
-#### Goal
-
-| Функция | Описание |
-|---------|----------|
-| `build_fixed_goal(target: int) -> Goal` | Создать фиксированную цель |
-| `build_spinpad_goal(multiplier, min, max) -> Goal` | Создать цель на основе спинпада |
-
-#### Reward
-
-| Функция | Описание |
-|---------|----------|
-| `build_fixed_chips_reward(amount: float) -> Reward` | Создать фиксированную награду в чипах |
-| `build_rtp_chips_reward(percentage, min, max) -> Reward` | Создать RTP-награду в чипах |
-
-#### Node
-
-| Функция | Описание |
-|---------|----------|
-| `build_progress_node(**kwargs) -> ProgressNode` | Создать узел прогрессии |
-| `build_entries_node(**kwargs) -> EntriesNode` | Создать узел входов |
-| `build_dummy_node(**kwargs) -> DummyNode` | Создать фиктивный узел |
-
-#### Event
-
-| Функция | Описание |
-|---------|----------|
-| `build_node_event(**kwargs) -> PossibleNodeEventData` | Создать структуру события |
+`load_config_from_json` добавляет ключи LiveEvent даже к SinglePick-файлу — для SinglePick смысл имеет
+только парсинг, а тип определяется дальше через `SinglePickConfig.from_dict`.
 
 ---
 
 ### services/singlepick_validator.py
 
-Валидация конфигов SinglePick.
+| Объект | Описание |
+|---|---|
+| `ValidationError` | dataclass: `configset_name`, `field`, `message` |
+| `validate_configset_name(name, existing_names: list[str]) -> str \| None` | Сообщение об ошибке (пустое имя / дубликат) либо `None` |
+| `is_percentage_valid(percentage: float) -> bool` | Допускает **до 3 знаков** после запятой (реальные конфиги содержат значения вроде `0.028`) |
+| `validate_singlepick(config) -> list[ValidationError]` | Полная логическая проверка |
 
-| Функция | Описание |
-|---------|----------|
-| `validate_configset_name(name: str) -> bool` | Проверить корректность имени ConfigSet |
-| `is_percentage_valid(value: float) -> bool` | Проверить, что значение кратно 0.01 |
-| `validate_singlepick(config: SinglePickConfig) -> List[ValidationError]` | Полная валидация конфига SinglePick, возвращает список ошибок |
+Проверки в `validate_singlepick`:
+
+- имя ConfigSet непусто;
+- `PickersConfig.picks` непуст;
+- `WheelConfig.wedges` непуст;
+- в каждом `JackpotPick`: `min <= max`;
+- в каждом `RtpSPReward` (внутри `RewardPick`, `RetryPick`, `Wedge`): корректный `Percentage`.
 
 ---
 
-## UI компоненты (ui/)
+### services/builders.py
+
+Набор фабрик (`build_fixed_minbet`, `build_variable_minbet`, `build_fixed_goal`, `build_spinpad_goal`,
+`build_fixed_chips_reward`, `build_rtp_chips_reward`, `build_progress_node`, `build_node_event`).
+
+> **Модуль нигде не импортируется** и реализован не полностью: вместо части функций стоят комментарии
+> «*аналогичные функции для остальных типов*». Приложение создаёт события через `make_node_event`
+> из `models/event.py`, а узлы — напрямую конструкторами dataclass'ов.
+> `build_node_event` к тому же не принимает `starting_event_currency`, `is_currency_event`, `time_warning`.
+
+---
+
+## UI (ui/)
 
 ### ui/common.py
 
-Общие UI-утилиты для Streamlit.
-
-| Функция | Описание |
-|---------|----------|
-| `inject_sticky_right_column()` | Делает правую колонку sticky при прокрутке страницы |
-| `confirm_button(label, key, confirm_label)` | Кнопка с двухшаговым подтверждением |
-| `styled_info(message: str)` | Стилизованное информационное сообщение |
-| `styled_error(message: str)` | Стилизованное сообщение об ошибке |
-| `format_key(*parts) -> str` | Генерация уникальных ключей для виджетов Streamlit |
+| Функция | Статус | Описание |
+|---|---|---|
+| `inject_sticky_right_column()` | используется | Инжектит CSS: **последняя** колонка `stHorizontalBlock` становится `position: sticky` с прокруткой |
+| `confirm_button(label, key, message="Вы уверены?")` | не используется | Двухшаговое подтверждение; вкладки реализуют подтверждение вручную через `session_state` |
+| `styled_info(text)` / `styled_error(text)` | не используется | HTML-плашки |
+| `format_key(prefix, index)` | не используется | `f"{prefix}_{index}"` |
 
 ---
 
-### ui/import_tab.py
-
-Пакетный импорт данных из CSV или Excel файлов.
+### ui/import_tab.py — пакетный импорт CSV/Excel
 
 | Функция | Описание |
-|---------|----------|
-| `_load_with_header_detection(file) -> DataFrame` | Загрузить файл с автоматическим определением строки заголовка |
-| `auto_map_columns(df: DataFrame) -> dict` | Автоматически сопоставить колонки файла с полями модели по синонимам |
-| `_run_import(df, mapping, app_state)` | Выполнить импорт данных из DataFrame в текущее событие |
-| `render_import_tab(app_state)` | Отрендерить вкладку импорта |
+|---|---|
+| `FIELD_SYNONYMS` | Словарь: поле модели → список синонимов заголовка (24 поля, включая русские варианты) |
+| `_normalize(s)` | `strip().lower()`, `-` и пробел → `_` |
+| `_vip_range_from_segment_name(seg_name)` | `Vip2_5` → `"2-5"`; при несовпадении — `""` |
+| `auto_map_columns(df_columns: list[str]) -> dict[str, str \| None]` | Сопоставляет поля модели с реальными колонками по синонимам |
+| `_find_header_row(df_raw) -> int` | Первая строка, где ≥ 3 ячейки совпали с синонимами; иначе `0` |
+| `_load_with_header_detection(uploaded_file) -> DataFrame` | Читает CSV (автоподбор кодировки, `sep=None`) или Excel, ставит найденную строку заголовком, **дедуплицирует** повторяющиеся заголовки (`ChipsAmount` → `ChipsAmount_2`), выбрасывает полностью пустые строки |
+| `_read_file(uploaded_file)` | Устаревший вариант чтения без определения заголовка — **не используется** |
+| `render_import_tab()` | Обёртка: заголовок + `render_batch_import_panel(key="import_tab")`. **В `app.py` не вызывается** |
+| `render_batch_import_panel(key="editor_tab")` | Основная панель: справка, загрузка файла, предпросмотр, ручная правка маппинга в 2 колонки, кнопка «Начать импорт» |
+| `_get(row, field, final_mapping, default="")` | Безопасное чтение ячейки как строки |
+| `_run_import(df, final)` | Двухпроходный импорт |
 
-**Поддерживаемые форматы:** CSV (с автоопределением кодировки), Excel (.xlsx, .xls).
+**Логика `_run_import`:**
+
+1. Целевое событие — текущее; если не выбрано, берётся первое, а при отсутствии событий выводится ошибка.
+2. **Проход 1** — сегменты: уникальные значения `segment_name`; отсутствующие создаются,
+   `VIPRange` подставляется из имени, если распознан.
+3. **Проход 2** — узлы: создаются только `ProgressNode` и всегда добавляются в стадию 0.
+   - `NodeID` обязателен и должен быть > 0; дубликат внутри сегмента пропускается с предупреждением.
+   - Списки (`NextNodeID`, `GameList`) разделяются `;`, если он есть в строке, иначе `,`.
+   - MinBet: при заполненном `minbet_variable` → `VariableMinBet`, иначе `FixedMinBet(250000)`.
+   - Goal: при заполненном `goal_multiplier` → `SpinpadGoal`, иначе `FixedGoal(target=20)`.
+   - Награды: до двух `FixedReward` в чипах (`chips_amount`, `chips_amount_2`) + `CollectableSellPacksReward`
+     при заданных `pack_id` и `num_packs`; если ничего не собралось — одна награда `Chips 0`.
+   - Булевы значения распознаются как `true/1/yes/да`.
+4. Результат пишется через `update_event`, выводится сводка и список предупреждений
+   (номера строк указываются как `idx + 2` — с поправкой на строку заголовка).
+
+Обязательные поля маппинга — `segment_name` и `node_id`; без них кнопка импорта заблокирована.
 
 ---
 
@@ -482,90 +626,131 @@ utils/                        # Утилиты
 
 ### ui/tabs/editor_tab.py
 
-Главный редактор LiveEvent. Реализует пошаговый процесс создания конфигурации.
+**`render_editor_tab()`** — редактор LiveEvent. Вызывает `inject_sticky_right_column()`.
 
-**Функция `render_editor_tab(app_state: AppState)`**
+**Блок «🗂️ Загрузка и валидация конфига»** (expander):
 
-Рендерит вкладку редактора. Включает:
+- **🆕 Новый конфиг** — при непустом конфиге требует подтверждения (`editor_confirm_reset`),
+  затем сбрасывает конфиг, staged, контекст редактирования и флаги создания.
+- **📂 Загрузить JSON** — повторная загрузка того же имени файла игнорируется
+  (`editor_last_loaded_file`). **Если событий > 1 — включается staged-режим**, иначе конфиг
+  загружается напрямую.
+- **Панель staged** — выбор события по `EventID`, «✏️ Открыть», «➕ Добавить»
+  (форма нового события с проверкой уникальности `EventID`),
+  «💾 Применить изменения в исходный конфиг» и подпись о том, что редактируется.
+- **📋 Схема + ✅ Проверить валидацию** — валидирует staged-конфиг с патчем, если он есть, иначе рабочий.
 
-1. **Загрузка** — загрузка JSON-файла, выбор события из staged конфига
-2. **Шаг 1: Событие** — создание или редактирование события (`PossibleNodeEventData`)
-3. **Шаг 2: Сегмент** — создание или редактирование сегмента (`Segment`)
-4. **Шаг 3: Узел** — создание или редактирование узла (через `render_node_editor`)
-5. **Дерево событий** — навигация по иерархии через `render_event_tree`
+**Основная область** — две колонки (`st.columns([2, 3])`): дерево слева, редактор справа.
 
-Поддерживает:
-- Staged-конфиг для работы с большими файлами (много событий)
-- Пакетный импорт из CSV/Excel
-- Дублирование событий, сегментов и узлов
+| Шаг | Условие показа | Содержимое |
+|---|---|---|
+| Пакетный импорт | `batch_import_event_idx >= 0` | Заголовок с `EventID`, кнопка закрытия, `render_batch_import_panel()` |
+| **ШАГ 1: Событие** | редактируется событие или `creating_event`, и не `creating_segment` | `st.form` со всеми полями события; блок «💵 CashOutEvent Settings»; при `show_advanced` — `StartingEventCurrency`, `IsCurrencyEvent`, `TimeWarning`; проверка уникальности `EventID` |
+| **ШАГ 2: Сегмент** | есть текущее событие и (редактируется сегмент или `creating_segment`) | Радио «Тип `PossibleSegmentInfo`» (4 типа + «Без `PossibleSegmentInfo`») **вне** формы, затем форма с именем и значением; имя и значение обязательны |
+| **ШАГ 3: Узел** | редактируется узел или `creating_node` | Для нового узла — радио выбора типа; далее `render_node_editor(node_type, node_obj, key_prefix=...)`. Ненулевой результат означает «сохранить» |
+
+Если ни один шаг не активен, выводится подсказка «Выберите элемент в дереве для редактирования».
 
 ---
 
 ### ui/tabs/export_tab.py
 
-Экспорт конфигурации LiveEvent в JSON.
+| Функция | Описание |
+|---|---|
+| `_copy_button(text)` | HTML/JS-кнопка «Copy to clipboard»; текст передаётся через base64, id кнопки — от md5 первых 64 символов |
+| `_validate_liveevent(cfg) -> list[str]` | Проверяет каждый `EventID` через `validate_event_id` и ищет дубликаты |
+| `render_export_tab()` | Вкладка экспорта |
 
-**Функция `render_export_tab(app_state: AppState)`**
+Поведение `render_export_tab()`:
 
-| Возможность | Описание |
-|-------------|----------|
-| Валидация | Проверка конфига перед экспортом |
-| Скачивание | Кнопка загрузки JSON-файла |
-| Копирование | Копирование JSON в буфер обмена через JavaScript |
-| Предпросмотр | Просмотр JSON с фильтром по конкретному событию |
+- при наличии staged-конфига экспортируется **он, с патчем** текущего события (выводится плашка);
+- при нуле событий — подсказка и заблокированная кнопка скачивания;
+- при ошибках валидации скачивание и копирование блокируются;
+- предпросмотр: «— Весь конфиг —» или одно событие
+  (`{"Events": [event], "IsFallbackConfig": ...}`), с отдельными кнопками скачивания и копирования.
+  Результат предпросмотра хранится в `export_preview_json` / `export_preview_filename`.
+
+Имя файла — фиксированное `LiveEventData.json` (константы из `utils/constants.py` здесь не используются).
 
 ---
 
 ### ui/tabs/singlepick_tab.py
 
-Редактор конфигурации SinglePick.
-
-**Класс `SinglePickState`** (dataclass)
+**Класс `SinglePickState`** (dataclass) в `st.session_state["singlepick_state"]`:
 
 | Поле | Тип | Описание |
-|------|-----|----------|
-| `config` | `SinglePickConfig` | Текущий конфиг |
-| `editing` | `Tuple[str, str, int]` | Что редактируется: (cs_name, item_type, item_idx) |
-| `staged_cfg` | `dict` | Исходный большой конфиг |
+|---|---|---|
+| `config` | `SinglePickConfig` | Рабочий конфиг |
+| `editing` | `Tuple[str, str, int]` | Что открыто справа (см. ниже) |
+| `confirm_delete_cs` | `str` | Имя ConfigSet, для которого запрошено удаление |
+| `confirm_type_change` | `bool` | Запрошена смена типа ConfigSet |
+| `staged_cfg` | `Optional[dict]` | Исходный большой конфиг (сырой словарь) |
+| `staged_cs_name` | `Optional[str]` | Имя открытого ConfigSet в staged |
 
-**Внутренние функции:**
+Семантика `editing`:
+
+| Значение | Что показывается справа |
+|---|---|
+| `("", "", -1)` | Ничего (подсказка) |
+| `("NEW_CS", "", -1)` | Форма нового ConfigSet |
+| `(cs_name, "", -1)` | Настройки ConfigSet: тип, `TotalPickOnBoard`, `PickUntilWin` |
+| `(cs_name, "pick", i)` | Редактор пика `i` |
+| `(cs_name, "wedge", i)` | Редактор сектора `i` |
 
 | Функция | Описание |
-|---------|----------|
-| `_render_toolbar(state)` | Панель загрузки файла и валидации |
-| `_render_tree(state)` | Дерево ConfigSet-ов с пиками и секторами |
-| `_render_editor(state)` | Редактор выбранного элемента |
-| `_render_reward_pick_form(pick, key)` | Форма редактирования RewardPick |
-| `_render_jackpot_pick_form(pick, key)` | Форма редактирования JackpotPick |
-| `_render_retry_pick_form(pick, key)` | Форма редактирования RetryPick |
-| `_render_wedge_form(wedge, key)` | Форма редактирования сектора колеса |
+|---|---|
+| `get_singlepick_state() -> SinglePickState` | Достаёт или создаёт состояние |
+| `move_pick_up(picks, index)` | Меняет местами `index-1` и `index` (кнопка «↓» вызывается как `move_pick_up(picks, i+1)`) |
+| `_default_pickers_config() -> PickersConfig` | `RewardPick` (1 000 000 Chips, W=1, PM=1) + `JackpotPick` (`CIJackpot` нулями) + `RetryPick`; `TotalPickOnBoard=1`, `PickUntilWin=0` |
+| `_get_staged_cs_names(state) -> list` | Имена ConfigSet-ов из staged |
+| `_load_staged_cs(state, cs_name)` | Загружает один ConfigSet в редактор |
+| `_apply_cs_to_staged(state) -> bool` | Возвращает изменения в staged |
+| `_add_cs_to_staged(state, cs_name, cs)` | Добавляет новый ConfigSet в staged и открывает его |
+| `_get_staged_cfg_with_patch(state) -> dict \| None` | Staged-конфиг с патчем текущего ConfigSet |
+| `_render_toolbar(state)` | Новый конфиг (с подтверждением), загрузка файла, панель staged, валидация |
+| `_render_tree(state)` | Дерево ConfigSet-ов: настройки, дублирование, удаление (с подтверждением), список пиков/секторов с кнопками ✏️ 📋 ↑ ↓ ❌, добавление элементов |
+| `_render_editor(state)` | Правая панель по значению `editing` |
+| `_render_reward_pick_form(state, pickers, i, pick)` | `Weight`, `PossibleMax`, список наград |
+| `_render_jackpot_pick_form(state, pickers, i, pick)` | `Weight`, `PossibleMax`, переключатель `FixedJackpot`/`CIJackpot` (смена типа пересоздаёт джекпот нулями), поля Min/Max/CIMin/CIMax, инлайн-ошибка при `Min > Max` |
+| `_render_retry_pick_form(state, pickers, i, pick)` | То же, что `RewardPick`, с пометкой «Награды необязательны» |
+| `_render_wedge_form(state, wheel, i, wedge)` | `Weight` + список наград |
+| `render_singlepick_tab()` | Точка входа: тулбар, разделитель, две колонки `[2, 3]` — дерево и редактор |
 
-**Функция `render_singlepick_tab()`** — точка входа для рендера вкладки.
+Особенности:
+
+- staged-режим включается при **> 1** ConfigSet; при 0–1 конфиг открывается напрямую;
+- `ValueError` из `SinglePickConfig.from_dict` показывается как «Файл не является SinglePick конфигом»;
+- смена типа ConfigSet требует подтверждения и **удаляет текущее содержимое**;
+- валидация в тулбаре: сначала логическая (`validate_singlepick`); проверка по JSON Schema выполняется
+  только если логическая прошла **и** файл схемы загружен;
+- формы правят объекты модели напрямую (без отдельной кнопки «Сохранить»);
+- новые пики из дерева создаются с `PossibleMax = 0`, а `JackpotPick` — с `FixedJackpot`.
 
 ---
 
 ### ui/tabs/singlepick_export_tab.py
 
-Экспорт конфигурации SinglePick в JSON.
+**`render_singlepick_export_tab()`** — вкладка экспорта SinglePick. Содержит свою копию `_copy_button`.
 
-**Функция `render_singlepick_export_tab()`**
+- Источник данных: staged-конфиг с патчем, если он есть, иначе `state.config.to_dict()`.
+- Счётчик ConfigSet-ов, подсказка и заблокированная кнопка при пустом конфиге.
+- Ошибки `validate_singlepick` выводятся как `[<ConfigSet>] <field>: <message>` и блокируют
+  скачивание и копирование.
+- Предпросмотр: «— Весь конфиг —» или один ConfigSet (`{"ConfigSets": {name: ...}}`).
+- Имя файла — `SinglePickConfig.json`.
 
-| Возможность | Описание |
-|-------------|----------|
-| Валидация | Встроенная проверка через `validate_singlepick()` |
-| Скачивание | Кнопка загрузки JSON-файла |
-| Копирование | Копирование JSON в буфер обмена |
-| Предпросмотр | Просмотр с фильтром по ConfigSet |
+> В staged-режиме логическая валидация проверяет **только текущий редактируемый ConfigSet**,
+> хотя экспортируется весь исходный конфиг.
 
 ---
 
 ### ui/tabs/validation_tab.py
 
-Валидация JSON-файлов по схеме.
+**`render_validation_tab()`** — простая страница: загрузка JSON (пишется в `AppState.set_cfg`),
+загрузка схемы, кнопка проверки через `validate_config`.
 
-**Функция `render_validation_tab()`**
-
-Позволяет загрузить JSON-файл и JSON Schema, после чего выполняет валидацию через `validate_config()` и отображает результат.
+> Вкладка **не подключена** в `app.py` — функция только реэкспортируется из `ui/tabs/__init__.py`
+> и `ui/__init__.py`. Схемная валидация LiveEvent доступна внутри `editor_tab`.
 
 ---
 
@@ -573,107 +758,141 @@ utils/                        # Утилиты
 
 ### ui/widgets/event_tree.py
 
-Дерево навигации по событиям, сегментам и узлам.
+**`render_event_tree()`** — иерархия Событие → Сегмент → Стадия/Узел. Константы:
+`MAX_EVENTS_VISIBLE = 20`, `MAX_NODES_PER_SEGMENT = 10`.
 
-**Функция `render_event_tree(app_state: AppState)`**
+| Возможность | Описание |
+|---|---|
+| Отложенное открытие узла | Ключ `_pending_edit_node`: если уже редактируется узел, дерево сначала делает `clear_editing()` + `rerun`, и только затем открывает новый |
+| Пагинация событий | Постраничная (`tree_events_page`), кнопки ◀ ▶ при > 20 событиях |
+| Пагинация узлов | Первые 10 узлов сегмента + кнопка «Показать ещё N узлов» / «Скрыть узлы» (`tree_show_all_{idx}_{seg}`) |
+| Кнопки события | ✏️ редактировать · 📋 дублировать · ❌ удалить · 📥 пакетный импорт · ➕ добавить сегмент |
+| Кнопки сегмента | ✏️ · 📋 · ❌ · ➕ добавить ноду |
+| Кнопки узла | ✏️ · 📋 · ❌; в подписи — тип, `NodeID` и `NextNodeID` |
 
-Отображает иерархическое дерево: Событие → Сегмент → Стадия → Узел.
-
-| Особенность | Описание |
-|-------------|----------|
-| Пагинация событий | Показывает до 20 событий (MAX_EVENTS_VISIBLE) |
-| Пагинация узлов | Показывает до 10 узлов на сегмент (MAX_NODES_PER_SEGMENT) |
-| Кнопки | Редактирование, дублирование, удаление для каждого элемента |
-| Отложенное открытие | Поддержка открытия узла после `clear_editing` |
+Дерево читает **сырые словари** (`get_events_raw()`), а не десериализованные модели.
 
 ---
 
 ### ui/widgets/node_editor.py
 
-Универсальный редактор узлов всех типов.
+#### Система снимков
 
-#### Система снимков (snapshots)
-
-Используется для безопасного редактирования — позволяет откатить изменения.
-
-| Функция | Описание |
-|---------|----------|
-| `set_node_snapshot(node, key)` | Сохранить снимок узла в session_state |
-| `_get_snapshot(key) -> Node` | Получить сохранённый снимок |
-| `_clear_widget_keys(key)` | Сбросить ключи виджетов для перерисовки |
-
-#### Формы редактирования
+Streamlit кэширует значения виджетов по их ключам, поэтому при переключении на другой узел форма
+показала бы данные предыдущего. Решение — «снимок» в `session_state` плюс принудительный сброс ключей.
 
 | Функция | Описание |
-|---------|----------|
-| `render_progress_node_form(node, key, show_advanced) -> ProgressNode` | Форма для ProgressNode |
-| `render_entries_node_form(node, key, show_advanced) -> EntriesNode` | Форма для EntriesNode |
-| `render_dummy_node_form(node, key, show_advanced) -> DummyNode` | Форма для DummyNode |
-| `render_node_editor(node, key, show_advanced) -> Node` | Универсальный рендерер — автоматически выбирает нужную форму |
+|---|---|
+| `_snapshot_key(prefix)` | `f"_node_snapshot_{prefix}"` |
+| `set_node_snapshot(prefix, node)` | Кладёт снимок и сбрасывает ключи виджетов (в приложении не вызывается) |
+| `_clear_widget_keys(prefix, node)` | Удаляет из `session_state` ключи виджетов, перечисленные **явными списками** для каждого типа узла |
+| `_get_snapshot(prefix)` / `_clear_snapshot(prefix)` | Чтение / удаление снимка |
 
-Поддерживает расширенные параметры (`show_advanced`), управляемые через вкладку ⚙️ Настройки.
+#### Формы
+
+| Функция | Подпись | Возврат |
+|---|---|---|
+| `render_progress_node_form(prefix, existing=None)` | «📊 Progress Node» | `ProgressNode` при нажатии «💾 Сохранить», иначе `None` |
+| `render_entries_node_form(prefix, existing=None)` | «🚪 Entries Node» | `EntriesNode` или `None` |
+| `render_dummy_node_form(prefix, existing=None)` | «🎲 Dummy Node» | `DummyNode` или `None` |
+| `render_node_editor(node_type, existing=None, key_prefix="node")` | — | Делегирует нужной форме; при неизвестном типе выводит ошибку |
+
+`render_node_editor` сравнивает `(тип, node_id)` переданного узла с `_node_loaded_id_{prefix}`;
+при расхождении сбрасывает ключи виджетов, обновляет снимок и вызывает `st.rerun()`.
+
+Что показывают формы:
+
+- **ProgressNode** — `NodeID`, `NextNodeID`, `GameList`, `MiniGame`, кнопочные поля, `IsLastNode`,
+  `HideLoadingScreenForReward`, MinBet, цель, список наград, `CustomTexts`, `PossibleItemCollect`,
+  `PrizeBoxIndex` (подпись «0 = не задано»); под `show_advanced` — `ResegmentFlag`, `ContributionLevel`.
+  Пустой `PossibleItemCollect` при сохранении заменяется на `"Default"`; пустой `NextNodeID` → `[2]`.
+- **EntriesNode** — `NodeID`, `GameList`, `GoalType`, `EntryTypes`, MinBet, кнопочные поля,
+  `CustomTexts`, `PossibleItemCollect`, `PrizeBoxIndex`; под `show_advanced` — `ResegmentFlag`.
+- **DummyNode** — `NodeID`, `NextNodeID` (пустой → `[11, 21, 31]`), `DefaultNodeID`, `CustomTexts`;
+  всё остальное (`ResegmentFlag`, `IsLastNode`, `IsChoiceEvent`, `HideLoadingScreenForReward`,
+  `PrizeBoxIndex`, `MiniGame`, `ContributionLevel`, кнопочные поля) — только под `show_advanced`.
+  **Награды не редактируются**: при сохранении всегда подставляется `[get_default_reward()]`.
 
 ---
 
 ### ui/widgets/minbet_widget.py
 
-Редактор минимальной ставки.
+**`render_minbet_widget(prefix, existing=None) -> FixedMinBet | VariableMinBet`**
 
-**Функция `render_minbet_widget(minbet, key) -> MinBet`**
-
-Отображает выбор между `FixedMinBet` и `VariableMinBet` с соответствующими полями ввода. Возвращает обновлённый объект ставки.
+Радио `Fixed` / `Variable`. Дефолты: `Fixed` — `250 000`; `Variable` — `0.8` / `25 000` / `5 000 000`.
+Ключи виджетов: `{prefix}_minbet_type`, `{prefix}_fixed`, `{prefix}_var`, `{prefix}_min`, `{prefix}_max`.
+Объект возвращается на каждом рендере, отдельной кнопки сохранения нет.
 
 ---
 
 ### ui/widgets/goal_widget.py
 
-Редактор цели узла.
+**`render_goal_widget(prefix, existing=None) -> Goal`**
 
-**Функция `render_goal_widget(goal, key) -> Goal`**
-
-Отображает выбор типа цели и динамически показывает поля в зависимости от выбранного типа. Поддерживает все типы целей: `FixedGoal`, `SpinpadGoal`, `ConsecutiveWinsGoal`, `TotalCoinsPerDayGoal`, `TotalCoinsPerDayWithSpinLimiterGoal`, `FixedGoalWithSpinLimiterGoal`.
+Текстовое поле `Type` (по умолчанию `Spins`) + селектор параметров из шести значений:
+`SpinpadGoal`, `FixedGoal`, `ConsecutiveWinsGoal`, `TotalCoinsPerDay`,
+`TotalCoinsPerDayWithSpinLimiter`, `FixedGoalWithSpinLimiter`. Тип текущих параметров определяется
+по `isinstance`; поля рисуются под выбранный тип. Изменения применяются сразу.
 
 ---
 
 ### ui/widgets/reward_widget.py
 
-Редактор одной награды.
+**`render_reward_widget(prefix, index, existing=None) -> Reward`**
 
-**Функция `render_reward_widget(reward, key) -> Reward`**
+Селектор типа из `REWARD_TYPES` (12 значений) с обратным определением типа по существующей награде.
+Соответствие «тип в UI → модель»:
 
-Отображает форму для одной награды с динамическими полями в зависимости от типа. Поддерживает все типы наград: `FixedReward`, `RtpReward`, `FreeplayUnlockReward`, `CollectableSellPacksReward`, `CollectableMagicPacksReward`.
+| Тип в UI | Модель | `Currency` |
+|---|---|---|
+| `Chips` | `FixedReward` | `Chips` |
+| `MLM` | `FixedReward` | `Tickets` |
+| `Loyalty Point` | `FixedReward` | `Loyalty` |
+| `Vip Points` | `FixedReward` | `VipPoints` |
+| `Sweepstakes` | `FixedReward` | `Entries_Name` |
+| `BoardGameDices` / `BoardGameBuilds` / `BoardGameRareBuilds` | `FixedReward` | одноимённая |
+| `VariableChips` | `RtpReward` | `Chips` |
+| `FreePlays` | `FreeplayUnlockReward` | — |
+| `Packs` | `CollectableSellPacksReward` | — |
+| `MagicPacks` | `CollectableMagicPacksReward` | — (1–5 пачек) |
 
 ---
 
 ### ui/widgets/rewards_editor.py
 
-Редактор списка наград.
-
 | Функция | Описание |
-|---------|----------|
-| `get_default_reward() -> Reward` | Возвращает стандартную награду (2 500 000 чипов) |
-| `render_rewards_editor(rewards, key) -> List[Reward]` | Полный редактор списка наград с добавлением, удалением и редактированием |
+|---|---|
+| `get_default_reward() -> Reward` | `FixedReward(Chips, 2 500 000)` |
+| `render_rewards_editor(prefix, existing_rewards) -> List[Reward]` | Список наград с кратким описанием, кнопками ✏️/❌, добавлением и отменой |
+
+Состояние: `{prefix}_rewards` (сам список), `{prefix}_editing_idx`, `{prefix}_show_add`.
+Список инициализируется из `existing_rewards` **только при первом вызове**; если он пуст,
+подставляется одна награда по умолчанию.
 
 ---
 
 ### ui/widgets/singlepick_reward_widget.py
 
-Редактор награды SinglePick.
+**`render_sp_reward_widget(prefix, index, existing=None) -> SPReward`**
 
-**Функция `render_sp_reward_widget(reward, key) -> SPReward`**
-
-Форма для SinglePick-награды. Поддерживает типы: `Chips` (FixedSPReward), `VariableChips` (RtpSPReward), `FreePlays` (FreeplaySPReward), `Packs` (PacksSPReward), `PurchaseReward` (PurchaseSPReward). Автоматически определяет тип из существующей награды.
+Локальный список `SP_REWARD_TYPES` (12 значений; есть `PurchaseReward`, нет `MagicPacks`) и
+`_CURRENCY_MAP` / `_CURRENCY_TO_TYPE` для обратного определения типа через `_detect_type`.
+Типы: фиксированные валюты → `FixedSPReward`, `VariableChips` → `RtpSPReward`,
+`FreePlays` → `FreeplaySPReward`, `Packs` → `PacksSPReward`, иначе `PurchaseSPReward`
+(поля `ShopType` и `ShopName`). Суммы приводятся к `int`.
 
 ---
 
 ### ui/widgets/singlepick_rewards_editor.py
 
-Редактор списка наград SinglePick.
-
 | Функция | Описание |
-|---------|----------|
-| `get_default_sp_reward() -> SPReward` | Возвращает стандартную SinglePick-награду |
-| `render_sp_rewards_editor(rewards, key) -> List[SPReward]` | Полный редактор списка SinglePick-наград |
+|---|---|
+| `_reward_desc(reward) -> str` | Краткое описание для списка |
+| `get_default_sp_reward() -> SPReward` | `FixedSPReward(Chips, 1 000 000)` (импортируется в `singlepick_tab`, но не вызывается) |
+| `render_sp_rewards_editor(prefix, existing_rewards) -> List[SPReward]` | Аналог `render_rewards_editor`; пустой список остаётся пустым |
+
+Состояние: `{prefix}_sp_rewards`, `{prefix}_sp_editing_idx`, `{prefix}_sp_show_add`.
+При удалении редактируемой награды индекс редактирования сбрасывается.
 
 ---
 
@@ -681,88 +900,186 @@ utils/                        # Утилиты
 
 ### utils/constants.py
 
-Константы и дефолтные значения приложения.
+| Группа | Константы |
+|---|---|
+| Дефолты события | `DEFAULT_EVENT_ID`, `DEFAULT_ASSET_BUNDLE`, `DEFAULT_BLOCKER_PREFAB`, `DEFAULT_ROUNDEL_PREFAB`, `DEFAULT_EVENT_CARD_PREFAB`, `DEFAULT_NODE_COMPLETION_PREFAB`, `DEFAULT_CONTENT_KEY`, `DEFAULT_MIN_LEVEL`, `DEFAULT_REPEATS`, `DEFAULT_SEGMENT` |
+| Сегменты | `DEFAULT_VIP_RANGE = "1-10+"`, `SEGMENT_INFO_TYPES` (4 типа → подписи для UI), `SEGMENT_INFO_NONE = ""` |
+| Дефолты узла | `DEFAULT_GAME_LIST`, `DEFAULT_BUTTON_TEXT`, `DEFAULT_MINIGAME`, `DEFAULT_CONTRIBUTION_LEVEL` |
+| Типы наград | `REWARD_TYPES` (12 значений) |
+| Типы целей | `GOAL_TYPES` (`Spins`, `Coins`, `Wins`, `ConsecutiveWins`, `TotalCoinsPerDay`) |
+| Валюты | `CURRENCY_TYPES` (8 значений) |
+| Имена файлов | `DEFAULT_OUTPUT_FILENAME = "LiveEventData.json"`, `DEFAULT_SCHEMA_FILENAME = "schema.json"` |
+| Прочее | `MAX_NODE_ID = 999999`, `MIN_BET_MIN_VALUE = 0.0`, `MIN_BET_MAX_VALUE = 1_000_000_000.0` |
 
-| Группа | Примеры |
-|--------|---------|
-| Дефолтные значения событий | `DEFAULT_EVENT_ID`, `DEFAULT_MIN_LEVEL` |
-| Дефолтные значения узлов | `DEFAULT_NODE_ID`, `DEFAULT_GAME_LIST` |
-| Типы наград | `REWARD_TYPES`, `CURRENCY_TYPES` |
-| Типы целей | `GOAL_TYPES` |
-| Диапазоны значений | `MIN_BET_MIN_VALUE`, `MAX_NODE_ID` |
-| Имена файлов | `DEFAULT_EXPORT_FILENAME` |
-
----
+Реально импортируются только `DEFAULT_VIP_RANGE`, `SEGMENT_INFO_TYPES`, `SEGMENT_INFO_NONE`
+(в `editor_tab`) и `REWARD_TYPES` (в `reward_widget`); остальные значения продублированы литералами
+в коде форм. `utils/__init__.py` не реэкспортирует `SEGMENT_INFO_TYPES`, `SEGMENT_INFO_NONE`,
+`DEFAULT_OUTPUT_FILENAME`, `DEFAULT_SCHEMA_FILENAME`, `MAX_NODE_ID`, `MIN_BET_*`.
 
 ### utils/helpers.py
 
-Вспомогательные функции для обработки данных.
-
-| Функция | Описание |
-|---------|----------|
-| `parse_comma_separated_list(text: str) -> List[str]` | Разбор строки с запятыми в список |
-| `join_list_to_comma_string(lst: List[str]) -> str` | Объединение списка в строку через запятую |
-| `process_multiline_text(text: str) -> List[str]` | Разбор многострочного текста в список |
-| `format_number(value: float) -> str` | Форматирование числа для отображения |
-
----
+| Функция | Описание | Используется |
+|---|---|---|
+| `parse_comma_separated_list(text) -> List[str]` | Разбор строки через запятую, пустые элементы отбрасываются | да |
+| `join_list_to_comma_string(items) -> str` | `", ".join(items)` | нет |
+| `process_multiline_text(text) -> List[str]` | Непустые строки многострочного текста | да |
+| `format_number(value, precision=2) -> str` | Форматирование с заданной точностью | нет |
 
 ### utils/validators.py
 
-Функции валидации данных перед сохранением.
+**Все функции возвращают `List[str]`** — список сообщений об ошибках; пустой список означает
+успешную валидацию.
 
-| Функция | Описание |
-|---------|----------|
-| `validate_event_id(event_id: str) -> Tuple[bool, str]` | Проверка корректности EventID |
-| `validate_node_id(node_id: int) -> Tuple[bool, str]` | Проверка корректности NodeID |
-| `validate_game_list(game_list: List[str]) -> Tuple[bool, str]` | Проверка списка игр |
-| `validate_min_bet(min_bet) -> Tuple[bool, str]` | Проверка минимальной ставки |
-| `validate_goal(goal) -> Tuple[bool, str]` | Проверка цели узла |
-| `validate_rewards(rewards) -> Tuple[bool, str]` | Проверка списка наград |
-| `validate_segment_name(name: str) -> Tuple[bool, str]` | Проверка имени сегмента |
-| `validate_vip_range(value: str) -> Tuple[bool, str]` | Проверка формата VIP-диапазона |
+| Функция | Проверки |
+|---|---|
+| `validate_event_id(event_id)` | Непустой; только латиница, цифры, `_`, `-` |
+| `validate_node_id(node_id, existing_ids=None)` | Положительный; отсутствует в `existing_ids` |
+| `validate_game_list(game_list)` | Список непуст; имена непусты |
+| `validate_min_bet(min_bet)` | `FixedMinBet.amount >= 0`; для `VariableMinBet`: `variable > 0`, `min >= 0`, `max >= min` |
+| `validate_goal(goal)` | `Goal.type` непуст |
+| `validate_rewards(rewards)` | Список непуст; `amount > 0`, если поле есть |
+| `validate_segment_name(name)` | Непустое; только латиница, цифры, `_`, `-` |
+| `validate_vip_range(value)` | Формат `1-10` или `1-10+` |
 
-Все функции возвращают кортеж `(is_valid: bool, error_message: str)`.
+Из модуля вызывается только `validate_event_id` (в `export_tab`); валидация в формах реализована
+инлайн, поэтому, например, имена сегментов с кириллицей формы пропускают.
 
 ---
 
-## Поток данных
+## Потоки данных
 
 ```
-Загрузка JSON
-    └─> load_config_from_json()
-    └─> AppState.set_cfg()
+Загрузка LiveEvent
+    └─> load_config_from_json(bytes)          # кодировки, setdefault корневых ключей
+    ├─ событий > 1 ──> AppState.set_staged_cfg()  ──> load_staged_event(idx) ──> set_cfg({одно событие})
+    └─ событий ≤ 1 ──> AppState.set_cfg() + clear_staged()
 
 Редактирование
-    └─> UI виджеты
-    └─> AppState (кэширование событий)
-    └─> AppState.update_event()
+    └─> дерево: start_editing_event / _segment / _node   # deepcopy в editing_context
+    └─> формы правят копию
+    └─> apply_editing() ──> update_event() ──> инвалидация _event_cache
 
-Экспорт
-    └─> AppState.get_cfg()
-    └─> save_config_to_json()
-    └─> JSON файл / буфер обмена
+Возврат в исходник (staged)
+    └─> apply_event_to_staged()               # по кнопке
+    └─> get_staged_cfg_with_patch()           # автоматически при экспорте и валидации
 
-Валидация
-    └─> cfg + schema
-    └─> validate_config()
-    └─> результат
+Экспорт LiveEvent
+    └─> _validate_liveevent(cfg)              # EventID: формат и дубликаты
+    └─> save_config_to_json(cfg)              # indent=4, UTF-8
+    └─> download_button / _copy_button
+
+Валидация по схеме
+    └─> validate_config(cfg, schema)          # jsonschema; без схемы — (False, "Схема не загружена")
+
+SinglePick
+    └─> load_config_from_json ──> SinglePickConfig.from_dict   # ValueError = не тот формат
+    ├─ ConfigSet-ов > 1 ──> state.staged_cfg ──> _load_staged_cs(name)
+    └─ ConfigSet-ов ≤ 1 ──> state.config
+    └─> формы правят модель напрямую
+    └─> validate_singlepick(state.config) ──> to_dict() / _get_staged_cfg_with_patch() ──> экспорт
 ```
+
+---
+
+## Ключи `st.session_state`
+
+| Ключ | Назначение |
+|---|---|
+| `app_state`, `singlepick_state` | Экземпляры состояния |
+| `show_advanced` | Тумблер расширенных параметров (вкладка «Настройки») |
+| `creating_event`, `creating_segment`, `creating_node` | Флаги режима создания в редакторе LiveEvent |
+| `editor_confirm_reset` | Запрошен сброс конфига |
+| `editor_last_loaded_file`, `editor_staged_file_name` | Защита от повторной загрузки и имя staged-файла |
+| `editor_staged_selected_idx`, `editor_staged_creating_new` | Открытое событие staged и форма нового события |
+| `editor_json_uploader`, `editor_schema_uploader` | Загрузчики файлов |
+| `batch_import_event_idx` | Индекс события для пакетного импорта (`-1` — панель закрыта) |
+| `map_{field}`, `file_uploader_{key}` | Маппинг колонок и загрузчик импорта |
+| `tree_events_page`, `tree_show_all_{idx}_{seg}` | Пагинация дерева |
+| `_pending_edit_node` | Отложенное открытие узла после `clear_editing` |
+| `_node_snapshot_{prefix}`, `_node_loaded_id_{prefix}` | Снимок узла и признак загруженного узла |
+| `segment_info_type_selector`, `…_radio` | Тип `PossibleSegmentInfo` в форме сегмента |
+| `{prefix}_rewards`, `{prefix}_editing_idx`, `{prefix}_show_add` | Состояние редактора наград LiveEvent |
+| `{prefix}_sp_rewards`, `{prefix}_sp_editing_idx`, `{prefix}_sp_show_add` | То же для SinglePick |
+| `export_filter_event_id`, `export_preview_json`, `export_preview_filename` | Предпросмотр экспорта LiveEvent |
+| `sp_confirm_reset`, `sp_last_loaded_file`, `sp_staged_cs_selector`, `sp_staged_selected_cs`, `sp_staged_creating_new` | Тулбар SinglePick |
+| `singlepick_export_filter`, `singlepick_export_preview_json`, `singlepick_export_preview_filename` | Предпросмотр экспорта SinglePick |
+
+`AppState.clear_editing()` дополнительно удаляет все ключи с префиксами `_node_loaded_id_`
+и `_node_snapshot_`.
 
 ---
 
 ## Ключевые особенности
 
-**Staged-конфиг** — при работе с большими файлами (много событий) приложение загружает только одно событие в рабочую память, а остальные хранит в staged конфиге. При экспорте изменения патчатся обратно.
+**Staged-конфиг** — при загрузке файла с более чем одним событием (или более чем одним ConfigSet)
+в рабочую память берётся только один элемент, остальное хранится в исходном виде.
+При экспорте и валидации изменения накладываются патчем. Подробности — в
+[STAGED_CONFIG_USAGE.md](STAGED_CONFIG_USAGE.md).
 
-**Кэширование событий** — события кэшируются в `AppState` для оптимизации производительности при частых обращениях.
+**Кэширование событий** — `AppState._event_cache` хранит десериализованные события по индексу;
+кэш инвалидируется при обновлении и корректно переиндексируется при удалении и дублировании.
 
-**Система снимков** — перед редактированием узла сохраняется его снимок, что позволяет безопасно отменить изменения.
+**Редактирование через копию** — `editing_context` держит `deepcopy`, поэтому отмена не оставляет
+следов в конфиге.
 
-**Пакетный импорт** — поддержка загрузки данных из CSV и Excel с автоматическим сопоставлением колонок по синонимам.
+**Система снимков** — обходит кэширование значений виджетов Streamlit при переключении между узлами.
 
-**Дублирование** — события, сегменты и узлы можно дублировать с автоматической генерацией уникальных имён (суффикс `_copy`).
+**Пакетный импорт** — CSV/Excel с автоопределением строки заголовка и сопоставлением колонок
+по синонимам, включая русские названия.
 
-**Расширенные параметры** — редкие поля скрыты по умолчанию и включаются через вкладку ⚙️ Настройки.
+**Дублирование** — события, сегменты, узлы, ConfigSet-ы, пики и секторы; для имён генерируется
+суффикс `_copy` / `_copy2` / …
 
-**Sticky UI** — правая колонка с редактором остаётся видимой при прокрутке длинного дерева событий.
+**Расширенные параметры** — редкие поля скрыты за тумблером на вкладке «⚙️ Настройки».
+
+**Sticky-панель** — CSS делает последнюю колонку (редактор) фиксированной при прокрутке дерева.
+
+---
+
+## Неиспользуемый код
+
+Перечисленное ниже присутствует в репозитории, но не вызывается приложением:
+
+| Объект | Файл |
+|---|---|
+| Весь модуль фабрик (и он же неполный) | `services/builders.py` |
+| `render_validation_tab` — вкладка не подключена в `app.py` | `ui/tabs/validation_tab.py` |
+| `render_import_tab` — импортируется в `app.py`, но не вызывается | `ui/import_tab.py` |
+| `_read_file` — заменён `_load_with_header_detection` | `ui/import_tab.py` |
+| `confirm_button`, `styled_info`, `styled_error`, `format_key` | `ui/common.py` |
+| `set_node_snapshot` | `ui/widgets/node_editor.py` |
+| `get_default_sp_reward` — импортируется, но не вызывается | `ui/widgets/singlepick_rewards_editor.py` |
+| `save_config_to_json_compact` | `services/json_io.py` |
+| `join_list_to_comma_string`, `format_number` | `utils/helpers.py` |
+| Все валидаторы, кроме `validate_event_id` | `utils/validators.py` |
+| Большинство константных значений (см. выше) | `utils/constants.py` |
+| `set_temp` / `get_temp` / `clear_temp`, свойство `Segment.vip_range` | `services/state_manager.py`, `models/event.py` |
+
+Тестов в репозитории нет: в `.kiro/specs/singlepick-tab/tasks.md` все задачи с юнит- и property-тестами
+помечены как опциональные и не выполнены, каталога `tests/` не существует.
+
+---
+
+## Известные ограничения
+
+- **`PrizeBoxIndex = 0` не сохраняется.** Все три типа узлов пишут ключ только при значении `> 0`,
+  а формы подписывают поле как «0 = не задано», поэтому нулевой индекс молча выпадает из JSON.
+- **`DummyNode` теряет награды.** Форма не редактирует список наград и при сохранении всегда
+  подставляет одну награду по умолчанию (`Chips 2 500 000`), затирая исходные.
+- **Сброс ключей виджетов неполон.** Списки в `_clear_widget_keys` не содержат ключей расширенных
+  параметров (`_p_resegment`, `_p_contrlevel`, `_e_resegment`, `_d_*` и др.), поэтому при включённом
+  `show_advanced` и переключении между узлами эти поля могут показывать значения предыдущего узла.
+- **Текст ошибки про `Percentage` расходится с проверкой.** `is_percentage_valid` допускает до трёх
+  знаков после запятой, а сообщение и спецификация говорят «кратно 0.01».
+- **Уникальность имён ConfigSet внутри одного конфига не проверяема** — они являются ключами `dict`;
+  `validate_configset_name` защищает только ввод нового имени.
+- **Валидация SinglePick в staged-режиме частичная** — проверяется лишь открытый ConfigSet,
+  тогда как экспортируется весь исходный конфиг.
+- **Валидация имён в формах слабее, чем в `utils/validators.py`.** Формы требуют лишь непустое имя,
+  так что сегмент с кириллицей или пробелами создать можно, хотя `validate_segment_name` его отверг бы.
+- **Один уровень стадий в UI.** Узлы всегда добавляются в `Stages[0]`; существующие стадии
+  отображаются и редактируются, но создать новую через интерфейс нельзя.
+- **`datetime.utcnow()`** в `get_default_time_warning()` помечен как устаревший в актуальных версиях
+  Python.
+- **Переменные колонок в `editor_tab` названы наоборот** (`right_col, left_col = st.columns([2, 3])`):
+  дерево отображается в левой колонке, редактор — в правой.

@@ -1,0 +1,7 @@
+# Зависимости LiveEvent JSON Builder
+# Установка: python -m pip install -r requirements.txt
+
+streamlit      # UI приложения (app.py, ui/)
+jsonschema     # валидация конфига по JSON Schema (services/json_io.py)
+pandas         # чтение CSV/Excel в пакетном импорте (ui/import_tab.py)
+openpyxl       # движок pandas для .xlsx
