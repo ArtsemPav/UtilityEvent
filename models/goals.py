@@ -35,7 +35,12 @@ class SpinpadGoal(Serializable):
 
 @dataclass
 class ConsecutiveWinsGoal(Serializable):
-    number_of_streaks_target: int
+    """
+    Цель на серии побед. Имена полей соответствуют схеме V10:
+      WinsInStreakTarget        — сколько побед должно быть в серии (скаляр);
+      NumberOfStreaksSpinPadGoal — сколько серий нужно собрать (Multiplier/Min/Max).
+    """
+    wins_in_streak_target: int
     multiplier: float
     min: int
     max: int
@@ -43,8 +48,8 @@ class ConsecutiveWinsGoal(Serializable):
     def to_dict(self) -> dict:
         return {
             "ConsecutiveWinsGoal": {
-                "NumberOfStreaksTarget": self.number_of_streaks_target,
-                "WinsInStreakSpinPadGoal": {
+                "WinsInStreakTarget": self.wins_in_streak_target,
+                "NumberOfStreaksSpinPadGoal": {
                     "Multiplier": self.multiplier,
                     "Min": self.min,
                     "Max": self.max
@@ -55,12 +60,21 @@ class ConsecutiveWinsGoal(Serializable):
     @classmethod
     def from_dict(cls, data: dict):
         inner = data.get("ConsecutiveWinsGoal", {})
-        wins_inner = inner.get("WinsInStreakSpinPadGoal", {})
+        # Старые конфиги приложения использовали перепутанные имена
+        # (NumberOfStreaksTarget / WinsInStreakSpinPadGoal) — читаем их как
+        # запасной вариант, значения остаются на своих местах: скаляр — в скаляр,
+        # блок Multiplier/Min/Max — в блок.
+        streaks_inner = inner.get("NumberOfStreaksSpinPadGoal")
+        if streaks_inner is None:
+            streaks_inner = inner.get("WinsInStreakSpinPadGoal", {})
+        target = inner.get("WinsInStreakTarget")
+        if target is None:
+            target = inner.get("NumberOfStreaksTarget", 3)
         return cls(
-            number_of_streaks_target=inner.get("NumberOfStreaksTarget", 3),
-            multiplier=wins_inner.get("Multiplier", 0.01),
-            min=wins_inner.get("Min", 2),
-            max=wins_inner.get("Max", 5)
+            wins_in_streak_target=target,
+            multiplier=streaks_inner.get("Multiplier", 0.01),
+            min=streaks_inner.get("Min", 2),
+            max=streaks_inner.get("Max", 5)
         )
 
 @dataclass

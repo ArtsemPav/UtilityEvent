@@ -125,19 +125,11 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
             value=src.button_action_data if src else "",
             key=f"{prefix}_p_btndata"
         )
-        ch_col1, ch_col2 = st.columns(2)
-        with ch_col1:
-            is_last = st.checkbox(
-                "IsLastNode",
-                value=src.is_last_node if src else False,
-                key=f"{prefix}_p_islast"
-            )
-        with ch_col2:
-            hide_loading = st.checkbox(
-                "HideLoadingScreenForReward",
-                value=src.hide_loading_screen if src else False,
-                key=f"{prefix}_p_hideload"
-            )
+        is_last = st.checkbox(
+            "IsLastNode",
+            value=src.is_last_node if src else False,
+            key=f"{prefix}_p_islast"
+        )
 
     min_bet = render_minbet_widget(f"{prefix}_p_minbet", src.min_bet if src else None)
 
@@ -163,10 +155,11 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
         key=f"{prefix}_p_prizebox"
     )
 
-    # Расширенные параметры ProgressNode
+    # Расширенные параметры ProgressNode.
+    # HideLoadingScreenForReward — необязательный флаг: попадает в JSON только когда включён.
     if show_advanced:
         with st.expander("⚙️ Расширенные параметры", expanded=False):
-            adv_col1, adv_col2 = st.columns(2)
+            adv_col1, adv_col2, adv_col3 = st.columns(3)
             with adv_col1:
                 resegment_flag = st.checkbox(
                     "ResegmentFlag",
@@ -174,6 +167,12 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
                     key=f"{prefix}_p_resegment"
                 )
             with adv_col2:
+                hide_loading = st.checkbox(
+                    "HideLoadingScreenForReward",
+                    value=src.hide_loading_screen if src else False,
+                    key=f"{prefix}_p_hideload"
+                )
+            with adv_col3:
                 contribution_level = st.text_input(
                     "ContributionLevel",
                     value=src.contribution_level if src else "Node",
@@ -181,6 +180,7 @@ def render_progress_node_form(prefix: str, existing: Optional[ProgressNode] = No
                 )
     else:
         resegment_flag = src.resegment_flag if src else False
+        hide_loading = src.hide_loading_screen if src else False
         contribution_level = src.contribution_level if src else "Node"
 
     if st.button("💾 Сохранить Progress Node", key=f"{prefix}_save_progress", type="primary"):

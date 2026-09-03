@@ -43,7 +43,8 @@ class ProgressNode(Serializable):
                 "ButtonActionData": self.button_action_data,
                 "ButtonActionText": self.button_action_text,
                 "CustomTexts": self.custom_texts,
-                "HideLoadingScreenForReward": self.hide_loading_screen,
+                # Необязательный флаг: пишем только когда включён
+                **({"HideLoadingScreenForReward": True} if self.hide_loading_screen else {}),
             }
         }
         if self.possible_item_collect:
@@ -179,7 +180,8 @@ class DummyNode(Serializable):
                 "ButtonActionText": self.button_action_text,
                 "CustomTexts": self.custom_texts,
                 "IsChoiceEvent": self.is_choice_event,
-                "HideLoadingScreenForReward": self.hide_loading_screen,
+                # Необязательный флаг: пишем только когда включён
+                **({"HideLoadingScreenForReward": True} if self.hide_loading_screen else {}),
             }
         }
         if self.prize_box_index > 0:

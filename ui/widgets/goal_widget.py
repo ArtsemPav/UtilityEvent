@@ -100,30 +100,29 @@ def render_goal_widget(prefix: str, existing: Optional[Goal] = None) -> Goal:
         params = FixedGoal(target=int(target))
 
     elif selected_params == "ConsecutiveWinsGoal":
-        c1, c2 = st.columns(2)
+        wins_target = st.number_input(
+            "WinsInStreakTarget (побед в серии)",
+            value=params_obj.wins_in_streak_target if isinstance(params_obj, ConsecutiveWinsGoal) else 3,
+            min_value=1, step=1,
+            key=f"{prefix}_cw_wins_target"
+        )
+        st.caption("NumberOfStreaksSpinPadGoal — количество серий")
+        c1, c2, c3 = st.columns(3)
         with c1:
-            streaks = st.number_input(
-                "Number of Streaks",
-                value=params_obj.number_of_streaks_target if isinstance(params_obj, ConsecutiveWinsGoal) else 3,
-                min_value=1, step=1,
-                key=f"{prefix}_cw_streaks"
-            )
-        with c2:
             mult = st.number_input(
                 "Multiplier",
                 value=params_obj.multiplier if isinstance(params_obj, ConsecutiveWinsGoal) else 0.01,
-                min_value=0.0, max_value=1.0, step=0.01, format="%.3f",
+                min_value=0.001, max_value=1.0, step=0.01, format="%.3f",
                 key=f"{prefix}_cw_mult"
             )
-        c3, c4 = st.columns(2)
-        with c3:
+        with c2:
             min_v = st.number_input(
                 "Min",
                 value=params_obj.min if isinstance(params_obj, ConsecutiveWinsGoal) else 2,
                 min_value=1, step=1,
                 key=f"{prefix}_cw_min"
             )
-        with c4:
+        with c3:
             max_v = st.number_input(
                 "Max",
                 value=params_obj.max if isinstance(params_obj, ConsecutiveWinsGoal) else 5,
@@ -131,7 +130,7 @@ def render_goal_widget(prefix: str, existing: Optional[Goal] = None) -> Goal:
                 key=f"{prefix}_cw_max"
             )
         params = ConsecutiveWinsGoal(
-            number_of_streaks_target=int(streaks),
+            wins_in_streak_target=int(wins_target),
             multiplier=float(mult),
             min=int(min_v),
             max=int(max_v)

@@ -285,55 +285,74 @@ def render_editor_tab():
 
                         col_c1, col_c2 = st.columns(2)
                         with col_c1:
-                            is_roundel_hidden = st.checkbox(
-                                "IsRoundelHidden",
-                                value=event_obj.is_roundel_hidden if event_obj else False
+                            manual_claim = st.checkbox(
+                                "ManualClaim",
+                                value=event_obj.manual_claim if event_obj else False
                             )
                         with col_c2:
-                            show_roundel_all = st.checkbox(
-                                "ShowRoundelOnAllMachines",
-                                value=event_obj.show_roundel_on_all_machines if event_obj else False
+                            show_popup_on_empty_reward = st.checkbox(
+                                "ShowPopupOnEmptyReward",
+                                value=event_obj.show_popup_on_empty_reward if event_obj else False
                             )
 
-                        with st.expander("💵 CashOutEvent Settings", expanded=False):
-                            col_d1, col_d2, col_d3 = st.columns(3)
-                            with col_d1:
-                                use_node_failed = st.checkbox(
-                                    "UseNodeFailedNotification",
-                                    value=event_obj.use_node_failed_notification if event_obj else False
-                                )
-                            with col_d2:
-                                is_prize_pursuit = st.checkbox(
-                                    "IsPrizePursuit",
-                                    value=event_obj.is_prize_pursuit if event_obj else False
-                                )
-                            with col_d3:
-                                use_force_landscape = st.checkbox(
-                                    "UseForceLandscapeOnWeb",
-                                    value=event_obj.use_force_landscape_on_web if event_obj else False
-                                )
-
-                        # Расширенные параметры события
+                        # Расширенные параметры события.
+                        # Здесь же живут необязательные флаги, которые попадают в JSON
+                        # только когда включены (см. PossibleNodeEventData.to_dict).
                         if st.session_state.get("show_advanced", False):
                             with st.expander("⚙️ Расширенные параметры события", expanded=False):
+                                col_d1, col_d2 = st.columns(2)
+                                with col_d1:
+                                    is_roundel_hidden = st.checkbox(
+                                        "IsRoundelHidden",
+                                        value=event_obj.is_roundel_hidden if event_obj else False
+                                    )
+                                with col_d2:
+                                    show_roundel_all = st.checkbox(
+                                        "ShowRoundelOnAllMachines",
+                                        value=event_obj.show_roundel_on_all_machines if event_obj else False
+                                    )
+
+                                st.caption("💵 CashOutEvent")
                                 col_e1, col_e2, col_e3 = st.columns(3)
                                 with col_e1:
+                                    use_node_failed = st.checkbox(
+                                        "UseNodeFailedNotification",
+                                        value=event_obj.use_node_failed_notification if event_obj else False
+                                    )
+                                with col_e2:
+                                    is_prize_pursuit = st.checkbox(
+                                        "IsPrizePursuit",
+                                        value=event_obj.is_prize_pursuit if event_obj else False
+                                    )
+                                with col_e3:
+                                    use_force_landscape = st.checkbox(
+                                        "UseForceLandscapeOnWeb",
+                                        value=event_obj.use_force_landscape_on_web if event_obj else False
+                                    )
+
+                                col_f1, col_f2, col_f3 = st.columns(3)
+                                with col_f1:
                                     starting_currency = st.number_input(
                                         "StartingEventCurrency",
                                         value=event_obj.starting_event_currency if event_obj else 0.0,
                                         step=0.1
                                     )
-                                with col_e2:
+                                with col_f2:
                                     is_currency_event = st.checkbox(
                                         "IsCurrencyEvent",
                                         value=event_obj.is_currency_event if event_obj else False
                                     )
-                                with col_e3:
+                                with col_f3:
                                     time_warning = st.text_input(
                                         "TimeWarning (ISO 8601)",
                                         value=event_obj.time_warning if event_obj else get_default_time_warning()
                                     )
                         else:
+                            is_roundel_hidden = event_obj.is_roundel_hidden if event_obj else False
+                            show_roundel_all = event_obj.show_roundel_on_all_machines if event_obj else False
+                            use_node_failed = event_obj.use_node_failed_notification if event_obj else False
+                            is_prize_pursuit = event_obj.is_prize_pursuit if event_obj else False
+                            use_force_landscape = event_obj.use_force_landscape_on_web if event_obj else False
                             starting_currency = event_obj.starting_event_currency if event_obj else 0.0
                             is_currency_event = event_obj.is_currency_event if event_obj else False
                             time_warning = event_obj.time_warning if event_obj else get_default_time_warning()
@@ -364,6 +383,8 @@ def render_editor_tab():
                                     event_obj.is_prize_pursuit = is_prize_pursuit
                                     event_obj.use_force_landscape_on_web = use_force_landscape
                                     event_obj.show_roundel_on_all_machines = show_roundel_all
+                                    event_obj.manual_claim = manual_claim
+                                    event_obj.show_popup_on_empty_reward = show_popup_on_empty_reward
                                     event_obj.starting_event_currency = starting_currency
                                     event_obj.is_currency_event = is_currency_event
                                     event_obj.time_warning = time_warning
@@ -388,6 +409,8 @@ def render_editor_tab():
                                         is_prize_pursuit=is_prize_pursuit,
                                         use_force_landscape_on_web=use_force_landscape,
                                         show_roundel_on_all_machines=show_roundel_all,
+                                        manual_claim=manual_claim,
+                                        show_popup_on_empty_reward=show_popup_on_empty_reward,
                                         starting_event_currency=starting_currency,
                                         is_currency_event=is_currency_event,
                                         time_warning=time_warning,

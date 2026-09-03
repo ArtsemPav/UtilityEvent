@@ -1,0 +1,1599 @@
+{
+  "definitions": {
+    "ConsecutiveWinsGoalConfig": {
+      "type": "object",
+      "required": [
+        "WinsInStreakTarget",
+        "NumberOfStreaksSpinPadGoal"
+      ],
+      "properties": {
+        "WinsInStreakTarget": {
+          "type": "integer"
+        },
+        "NumberOfStreaksSpinPadGoal": {
+          "$ref": "#/definitions/MultiplierBasedValue"
+        }
+      }
+    },
+    "GoalConditions": {
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "MinWin": {
+          "$ref": "#/definitions/ThresholdCondition"
+        },
+        "Threshold": {
+          "$ref": "#/definitions/ThresholdCondition"
+        }
+      }
+    },
+    "ThresholdCondition": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "AvgBetBasedThreshold": {
+          "$ref": "#/definitions/MultiplierBasedValue"
+        },
+        "FixedValue": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "MultiplierBasedValue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Multiplier",
+        "Min",
+        "Max"
+      ],
+      "properties": {
+        "Multiplier": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "Min": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        },
+        "Max": {
+          "type": "integer",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "SegmentInfoJson": {
+      "type": "object",
+      "required": [],
+      "minProperties": 1,
+      "properties": {
+        "AverageWagerRange": {
+          "type": "string"
+        },
+        "SpinpadRange": {
+          "type": "string"
+        },
+        "LevelRange": {
+          "type": "string"
+        },
+        "VIPRange": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixedMinBetConfig": {
+      "type": "object",
+      "required": [
+        "MinBet"
+      ],
+      "properties": {
+        "MinBet": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MinBetVariableConfig": {
+      "type": "object",
+      "required": [
+        "Variable",
+        "Min",
+        "Max"
+      ],
+      "properties": {
+        "Variable": {
+          "type": "number"
+        },
+        "Min": {
+          "type": "number"
+        },
+        "Max": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "MinBetJson": {
+      "type": "object",
+      "required": [],
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "FixedMinBet": {
+          "$ref": "#/definitions/FixedMinBetConfig"
+        },
+        "MinBetVariable": {
+          "$ref": "#/definitions/MinBetVariableConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixedGoalConfig": {
+      "type": "object",
+      "required": [
+        "Target"
+      ],
+      "properties": {
+        "Target": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SpinPadGoalConfig": {
+      "type": "object",
+      "required": [
+        "Multiplier",
+        "Min",
+        "Max"
+      ],
+      "properties": {
+        "Multiplier": {
+          "type": "number"
+        },
+        "Min": {
+          "type": "number"
+        },
+        "Max": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TotalCoinsPerDayConfig": {
+      "type": "object",
+      "required": [
+        "Multiplier",
+        "Min",
+        "Max"
+      ],
+      "properties": {
+        "Multiplier": {
+          "type": "number"
+        },
+        "Min": {
+          "type": "number"
+        },
+        "Max": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixedGoalWithSpinLimiterConfig": {
+      "type": "object",
+      "required": [
+        "Target",
+        "SpinLimiter"
+      ],
+      "properties": {
+        "Target": {
+          "type": "number"
+        },
+        "SpinLimiter": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TotalCoinsPerDayWithSpinLimiterConfig": {
+      "type": "object",
+      "required": [
+        "SpinLimiter",
+        "Multiplier",
+        "Min",
+        "Max"
+      ],
+      "properties": {
+        "SpinLimiter": {
+          "type": "number"
+        },
+        "Multiplier": {
+          "type": "number"
+        },
+        "Min": {
+          "type": "number"
+        },
+        "Max": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "GoalJson": {
+      "type": "object",
+      "required": [
+        "Type"
+      ],
+      "minProperties": 2,
+      "maxProperties": 3,
+      "properties": {
+        "Type": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "FixedGoal": {
+          "$ref": "#/definitions/FixedGoalConfig"
+        },
+        "ConsecutiveWinsGoal": {
+          "$ref": "#/definitions/ConsecutiveWinsGoalConfig"
+        },
+        "SpinpadGoal": {
+          "$ref": "#/definitions/SpinPadGoalConfig"
+        },
+        "TotalCoinsPerDay": {
+          "$ref": "#/definitions/TotalCoinsPerDayConfig"
+        },
+        "TotalCoinsPerDayWithSpinLimiter": {
+          "$ref": "#/definitions/TotalCoinsPerDayWithSpinLimiterConfig"
+        },
+        "FixedGoalWithSpinLimiter": {
+          "$ref": "#/definitions/FixedGoalWithSpinLimiterConfig"
+        },
+        "Conditions": {
+          "$ref": "#/definitions/GoalConditions"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FixedRewardConfig": {
+      "type": "object",
+      "required": [
+        "Currency",
+        "Amount"
+      ],
+      "properties": {
+        "Currency": {
+          "type": "string",
+          "pattern": "^(Entries_[a-zA-Z0-9]+|Tickets|Chips|Loyalty|VipPoints|BoardGameDices|BoardGameBuilds|BoardGameRareBuilds)$"
+        },
+        "Amount": {
+          "type": "number",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "RtpRewardConfig": {
+      "type": "object",
+      "required": [
+        "Currency",
+        "Min",
+        "Max",
+        "Percentage"
+      ],
+      "properties": {
+        "Currency": {
+          "type": "string",
+          "enum": [
+            "Chips"
+          ]
+        },
+        "Min": {
+          "type": "number",
+          "minimum": 0
+        },
+        "Max": {
+          "type": "number",
+          "minimum": 0
+        },
+        "Percentage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "PurchaseRewardConfig": {
+      "type": "object",
+      "required": [
+        "ShopType",
+        "ShopName"
+      ],
+      "properties": {
+        "ShopType": {
+          "type": "string"
+        },
+        "ShopName": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "FreeplayUnlockRewardConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "GameName",
+        "Spins"
+      ],
+      "properties": {
+        "GameName": {
+          "type": "string",
+          "enum": [
+            "DragonsGlory",
+            "GongofRichesMarvelousTreasure",
+            "DoubleEnvelopesFestivalOfTheOrient",
+            "DragonFirecrackerJade",
+            "CrazyStuffedCoinsGoat",
+            "FortuneStreakFortuneElixir",
+            "MoneyInTheBankBaconBlvd",
+            "DragonsOrbJackpotsJadeRiches",
+            "ChiliChiliFireHotRushRedFever",
+            "MoneyInTheBankBaconBlvd",
+            "WingsOfThePhoenix",
+            "WingsOfThePhoenix_HR",
+            "WoodlandWhisper_HR",
+            "TropicalDreams_HR",
+            "GreatGuardiansLinkDragon",
+            "AllAboardCharmsOfTheOrient",
+            "AncientDragon_HR",
+            "AncientDragon",
+            "ChiliChiliFireBoosted",
+            "ChipCity_HR",
+            "WieRedFortune",
+            "LuckyVoyage_HR",
+            "PatrioticGame",
+            "PatrioticGame_HR",
+            "DestinyOfAthena",
+            "DestinyOfAthena_HR",
+            "MayanChiefERI_HR",
+            "GuardiansOfGiza",
+            "FairysWish",
+            "FairysWish_HR",
+            "SilentHillReturn",
+            "LeprechaunsGarden",
+            "AdornedPeacock",
+            "DragonsVoyage_HR",
+            "Shikibu_HR",
+            "Shikibu",
+            "LuckyHoneycombFortuneBags",
+            "BandOfGypsies_HR",
+            "KPowPigBrilliantBuddha",
+            "myVipGlory",
+            "SafariStacks",
+            "SafariStacks_HR",
+            "PrettyDevil",
+            "LadyOfCythera",
+            "LadyOfCythera_HR",
+            "FestivalOfRiches",
+            "FestivalOfRiches_HR",
+            "LuckyHog",
+            "DragonsVoyage",
+            "TreasureVoyage",
+            "TreasureVoyage_HR",
+            "TheGreatWilds",
+            "DauberFrenzyStampedeShark",
+            "FallingCoinsLinkAbundantBlessings",
+            "BullBlitzNewYorkLights",
+            "AmericasRichLifeSeasideRiches",
+            "AmericasRichLifeLuxuryNights",
+            "PiratesRose",
+            "SparklingRosesColorBloom",
+            "BaFangJinBaoAbundantFortune",
+            "FullMoonDiamond",
+            "FullMoonDiamond_HR",
+            "PandaPower",
+            "PandaPower_HR",
+            "GoldenPumpkin",
+            "GoldenPumpkin_HR",
+            "GlitteringPyramids",
+            "GlitteringPyramids_HR",
+            "ParisianPleasures",
+            "ParisianPleasures_HR",
+            "SamuraiSecrets",
+            "SamuraiSecrets_HR",
+            "MajesticWarriors",
+            "AfricanDiamond",
+            "AfricanDiamond_HR",
+            "AllAboardDynamiteDash",
+            "AllAboardGoWest",
+            "AllAboardMaskedWarrior",
+            "AllAboardPiggyPennies",
+            "AstronomicalMagic",
+            "AstronomicalMagic_HR",
+            "BellagioFountains",
+            "BingoDragon",
+            "BuckinBucks",
+            "BuckinBucks_HR",
+            "Buffalo",
+            "Buffalo_HR",
+            "BullBlitzFortuneOfTheOrient",
+            "BullBlitzRosesRiches",
+            "CelestialMoonRiches",
+            "CelestialMoonRichesEclipse",
+            "CelestialMoonRichesEclipse_HR",
+            "CelestialSunRiches",
+            "CelestialSunRichesEclipse",
+            "CelestialSunRichesEclipse_HR",
+            "ChilliChilliFireBoosted",
+            "ClassyRoses",
+            "ClassyRoses_HR",
+            "Diamondizer",
+            "DiamondRaider",
+            "DiamondRaider_HR",
+            "DiamondTrailsSafariWinnings",
+            "DragonEmblemJackpots",
+            "DragonFuryJackpots",
+            "DragonTreasurePearls",
+            "DragonTreasurePearls_HR",
+            "DragonsLawFortunePots",
+            "ElephantBreak",
+            "ElephantBreak_HR",
+            "FiveElementalLegends",
+            "FiveElementalLegends_HR",
+            "FiveLionsFestival",
+            "FiveLionsFestival_HR",
+            "FortuneMintFuGuiYouYu",
+            "FortuneMintFuXingGaoZhao",
+            "FortuneStacks",
+            "FortuneStacks_HR",
+            "FortuneRoadRomanHonor",
+            "FortuneRoadPowerofTheSamurai",
+            "GeniesPalace",
+            "GeniesPalace_HR",
+            "GreatGuardians",
+            "GreatGuardians_HR",
+            "GreatMoai",
+            "GreatMoai_HR",
+            "GoldenWolves",
+            "GoldenWolves_HR",
+            "GuardiansOfTheAztec",
+            "JestersMirror",
+            "JollyJackpots",
+            "LampDestiny",
+            "LampDestiny_HR",
+            "LionCarnival",
+            "LionCarnival_HR",
+            "LuckyEnvelopePlumRiches",
+            "LuckyMei",
+            "LuckyHog",
+            "LuckyHog_HR",
+            "LuckyOLearyJackpots",
+            "LuckyPinata",
+            "LuxorElectrolink",
+            "MajesticMoonTS",
+            "MayanChiefBoostedGreatStacks",
+            "MoneyBlast",
+            "MoneyBlast_HR",
+            "MoneyBolt",
+            "MoneyBolt_HR",
+            "MysticalPearlMermaid",
+            "MysticalPearlNeptune",
+            "OverflowingStacks",
+            "OverflowingStacks_HR",
+            "PandaPowerThunderWarrior",
+            "PatrickOPottsOfGold",
+            "PrideOfEgypt",
+            "PrideOfEgypt_HR",
+            "PrizeCatchMermaidParadise",
+            "QuestForRiches",
+            "QuestForRiches_HR",
+            "RadiantPhoenix",
+            "RadiantQueen",
+            "RadiantQueen_HR",
+            "ChipCity",
+            "MayanChiefERI",
+            "Rawhide",
+            "Rawhide_HR",
+            "RedFortune",
+            "RedFortune_HR",
+            "RepeatFeverDragonsReward",
+            "RomanLegion",
+            "RomanLegion_HR",
+            "RomanTribune",
+            "RomanTribune_HR",
+            "RuYiWheel",
+            "SandsofMystery",
+            "SandsofMystery_HR",
+            "SantasWildWorkshop",
+            "SantasWildWorkshop_HR",
+            "SizzlingHearts",
+            "SizzlingHearts_HR",
+            "ShieldOfPower",
+            "ShieldOfPower_HR",
+            "StarWatchFire",
+            "StuffedCoinsToad",
+            "TBCobraHearts",
+            "TBLionCarnival",
+            "TBLuckyHoneyCombTwinFever",
+            "TBMammothPower",
+            "TBSparklingRoses",
+            "ThunderArrowJurrassicQueen",
+            "ThunderWarrior",
+            "ThunderWarrior_HR",
+            "TreasureBallMoneyBlast",
+            "TreasureVoyage",
+            "UnwoolyRichesSugar",
+            "UnwoolyRichesSpice",
+            "WealthyMonkey",
+            "WealthyMonkey_HR",
+            "WildAztec",
+            "WildAztec_HR",
+            "WildLava",
+            "WildLava_HR",
+            "VikingWildSails",
+            "LuckyDrumsLion",
+            "LuckyVoyage",
+            "YinYangFortune",
+            "RichesDaikokuTS",
+            "PrizeStrikeMegaMiner",
+            "MoneyTrailsGoldenRabbit",
+            "ElectrifyingRiches",
+            "TropicalDreams",
+            "WizardStrike",
+            "WoodlandWhisper",
+            "AllAboardMightyPanda",
+            "LotusLandTS",
+            "BullBlitzToucanTwist",
+            "BandOfGypsies",
+            "LadyOfCythera",
+            "LadyOfCythera_HR",
+            "FestivalOfRiches",
+            "SafariStacks",
+            "SafariStacks_HR",
+            "WingsOfThePhoenix",
+            "LuckyHoneyCombFortuneBags",
+            "CharmsFullLinkLeprechaunsBlessing",
+            "PrettyDevil",
+            "PrettyDevil_HR",
+            "BarongPower"
+          ]
+        },
+        "Spins": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "CollectableSellPacksRewardConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "PackId"
+      ],
+      "properties": {
+        "PackId": {
+          "type": "string",
+          "enum": [
+            "sellPack1",
+            "sellPack10",
+            "sellPack100",
+            "sellPack11",
+            "sellPack14",
+            "sellPack15",
+            "sellPack150",
+            "sellPack16",
+            "sellPack18",
+            "sellPack2",
+            "sellPack20",
+            "sellPack200",
+            "sellPack23",
+            "sellPack25",
+            "sellPack27",
+            "sellPack3",
+            "sellPack30",
+            "sellPack33",
+            "sellPack35",
+            "sellPack4",
+            "sellPack40",
+            "sellPack49",
+            "sellPack5",
+            "sellPack50",
+            "sellPack6",
+            "sellPack60",
+            "sellPack7",
+            "sellPack70",
+            "sellPack75",
+            "sellPack8",
+            "sellPack80",
+            "sellPack9",
+            "sellPack90",
+            "sellPack95",
+            "sellPackDiscountA1",
+            "sellPackDiscountA10",
+            "sellPackDiscountA100",
+            "sellPackDiscountA11",
+            "sellPackDiscountA14",
+            "sellPackDiscountA15",
+            "sellPackDiscountA150",
+            "sellPackDiscountA16",
+            "sellPackDiscountA18",
+            "sellPackDiscountA2",
+            "sellPackDiscountA20",
+            "sellPackDiscountA200",
+            "sellPackDiscountA23",
+            "sellPackDiscountA25",
+            "sellPackDiscountA27",
+            "sellPackDiscountA3",
+            "sellPackDiscountA30",
+            "sellPackDiscountA33",
+            "sellPackDiscountA35",
+            "sellPackDiscountA4",
+            "sellPackDiscountA40",
+            "sellPackDiscountA49",
+            "sellPackDiscountA5",
+            "sellPackDiscountA50",
+            "sellPackDiscountA6",
+            "sellPackDiscountA60",
+            "sellPackDiscountA7",
+            "sellPackDiscountA70",
+            "sellPackDiscountA75",
+            "sellPackDiscountA8",
+            "sellPackDiscountA80",
+            "sellPackDiscountA9",
+            "sellPackDiscountA90",
+            "sellPackDiscountA95",
+            "sellPackDiscountB1",
+            "sellPackDiscountB10",
+            "sellPackDiscountB100",
+            "sellPackDiscountB11",
+            "sellPackDiscountB14",
+            "sellPackDiscountB15",
+            "sellPackDiscountB150",
+            "sellPackDiscountB16",
+            "sellPackDiscountB18",
+            "sellPackDiscountB2",
+            "sellPackDiscountB20",
+            "sellPackDiscountB200",
+            "sellPackDiscountB23",
+            "sellPackDiscountB25",
+            "sellPackDiscountB27",
+            "sellPackDiscountB3",
+            "sellPackDiscountB30",
+            "sellPackDiscountB33",
+            "sellPackDiscountB35",
+            "sellPackDiscountB4",
+            "sellPackDiscountB40",
+            "sellPackDiscountB49",
+            "sellPackDiscountB5",
+            "sellPackDiscountB50",
+            "sellPackDiscountB6",
+            "sellPackDiscountB60",
+            "sellPackDiscountB7",
+            "sellPackDiscountB70",
+            "sellPackDiscountB75",
+            "sellPackDiscountB8",
+            "sellPackDiscountB80",
+            "sellPackDiscountB9",
+            "sellPackDiscountB90",
+            "sellPackDiscountB95"
+          ]
+        },
+        "NumPacks": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "CollectableMagicPacksRewardConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "PackId"
+      ],
+      "properties": {
+        "PackId": {
+          "type": "string",
+          "enum": [
+            "magicPack1",
+            "magicPack10",
+            "magicPack100",
+            "magicPack11",
+            "magicPack14",
+            "magicPack15",
+            "magicPack150",
+            "magicPack16",
+            "magicPack18",
+            "magicPack2",
+            "magicPack20",
+            "magicPack200",
+            "magicPack23",
+            "magicPack25",
+            "magicPack27",
+            "magicPack3",
+            "magicPack30",
+            "magicPack33",
+            "magicPack35",
+            "magicPack4",
+            "magicPack40",
+            "magicPack49",
+            "magicPack5",
+            "magicPack50",
+            "magicPack6",
+            "magicPack60",
+            "magicPack7",
+            "magicPack70",
+            "magicPack75",
+            "magicPack8",
+            "magicPack80",
+            "magicPack9",
+            "magicPack90",
+            "magicPack95",
+            "magicPackDiscountA1",
+            "magicPackDiscountA10",
+            "magicPackDiscountA100",
+            "magicPackDiscountA11",
+            "magicPackDiscountA14",
+            "magicPackDiscountA15",
+            "magicPackDiscountA150",
+            "magicPackDiscountA16",
+            "magicPackDiscountA18",
+            "magicPackDiscountA2",
+            "magicPackDiscountA20",
+            "magicPackDiscountA200",
+            "magicPackDiscountA23",
+            "magicPackDiscountA25",
+            "magicPackDiscountA27",
+            "magicPackDiscountA3",
+            "magicPackDiscountA30",
+            "magicPackDiscountA33",
+            "magicPackDiscountA35",
+            "magicPackDiscountA4",
+            "magicPackDiscountA40",
+            "magicPackDiscountA49",
+            "magicPackDiscountA5",
+            "magicPackDiscountA50",
+            "magicPackDiscountA6",
+            "magicPackDiscountA60",
+            "magicPackDiscountA7",
+            "magicPackDiscountA70",
+            "magicPackDiscountA75",
+            "magicPackDiscountA8",
+            "magicPackDiscountA80",
+            "magicPackDiscountA9",
+            "magicPackDiscountA90",
+            "magicPackDiscountA95",
+            "magicPackDiscountB1",
+            "magicPackDiscountB10",
+            "magicPackDiscountB100",
+            "magicPackDiscountB11",
+            "magicPackDiscountB14",
+            "magicPackDiscountB15",
+            "magicPackDiscountB150",
+            "magicPackDiscountB16",
+            "magicPackDiscountB18",
+            "magicPackDiscountB2",
+            "magicPackDiscountB20",
+            "magicPackDiscountB200",
+            "magicPackDiscountB23",
+            "magicPackDiscountB25",
+            "magicPackDiscountB27",
+            "magicPackDiscountB3",
+            "magicPackDiscountB30",
+            "magicPackDiscountB33",
+            "magicPackDiscountB35",
+            "magicPackDiscountB4",
+            "magicPackDiscountB40",
+            "magicPackDiscountB49",
+            "magicPackDiscountB5",
+            "magicPackDiscountB50",
+            "magicPackDiscountB6",
+            "magicPackDiscountB60",
+            "magicPackDiscountB7",
+            "magicPackDiscountB70",
+            "magicPackDiscountB75",
+            "magicPackDiscountB8",
+            "magicPackDiscountB80",
+            "magicPackDiscountB9",
+            "magicPackDiscountB90",
+            "magicPackDiscountB95"
+          ]
+        },
+        "NumPacks": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 5
+        }
+      }
+    },
+    "RewardJson": {
+      "type": "object",
+      "required": [],
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "FixedReward": {
+          "$ref": "#/definitions/FixedRewardConfig"
+        },
+        "RtpReward": {
+          "$ref": "#/definitions/RtpRewardConfig"
+        },
+        "FreeplayUnlockReward": {
+          "$ref": "#/definitions/FreeplayUnlockRewardConfig"
+        },
+        "CollectableSellPacksReward": {
+          "$ref": "#/definitions/CollectableSellPacksRewardConfig"
+        },
+        "CollectableMagicPacksReward": {
+          "$ref": "#/definitions/CollectableMagicPacksRewardConfig"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ProgressNodeJson": {
+      "type": "object",
+      "required": [
+        "NodeID",
+        "NextNodeID",
+        "GameList",
+        "MinBet",
+        "Goal",
+        "Rewards",
+        "IsLastNode",
+        "ResegmentFlag",
+        "MiniGame",
+        "ContributionLevel",
+        "ButtonActionType",
+        "ButtonActionData",
+        "ButtonActionText",
+        "CustomTexts"
+      ],
+      "properties": {
+        "NodeID": {
+          "type": "number"
+        },
+        "NextNodeID": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "GameList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "MinBet": {
+          "$ref": "#/definitions/MinBetJson"
+        },
+        "Goal": {
+          "$ref": "#/definitions/GoalJson"
+        },
+        "FallbackGoal": {
+          "$ref": "#/definitions/GoalJson"
+        },
+        "Rewards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RewardJson"
+          }
+        },
+        "IsLastNode": {
+          "type": "boolean"
+        },
+        "HideLoadingScreenForReward": {
+          "type": "boolean"
+        },
+        "ResegmentFlag": {
+          "type": "boolean"
+        },
+        "MiniGame": {
+          "anyOf": [
+            {
+              "enum": [
+                "FlatReward"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "^SinglePick_"
+            }
+          ]
+        },
+        "ContributionLevel": {
+          "type": "string"
+        },
+        "ButtonActionType": {
+          "type": "string"
+        },
+        "ButtonActionData": {
+          "type": "string"
+        },
+        "ButtonActionText": {
+          "type": "string"
+        },
+        "PrizeBoxIndex": {
+          "type": "integer"
+        },
+        "CustomTexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "PossibleItemCollect": {
+          "type": "string"
+        },
+        "PossibleTimeGate": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "ClaimTooltipText": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EntiresNodeJson": {
+      "type": "object",
+      "required": [
+        "NodeID",
+        "GameList",
+        "MinBet",
+        "GoalType",
+        "ResegmentFlag",
+        "ButtonActionType",
+        "ButtonActionData",
+        "ButtonActionText",
+        "CustomTexts",
+        "EntryTypes"
+      ],
+      "properties": {
+        "NodeID": {
+          "type": "number"
+        },
+        "GameList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "MinBet": {
+          "$ref": "#/definitions/MinBetJson"
+        },
+        "GoalType": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ResegmentFlag": {
+          "type": "boolean"
+        },
+        "ButtonActionType": {
+          "type": "string"
+        },
+        "ButtonActionData": {
+          "type": "string"
+        },
+        "ButtonActionText": {
+          "type": "string"
+        },
+        "PrizeBoxIndex": {
+          "type": "integer"
+        },
+        "CustomTexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "PossibleItemCollect": {
+          "type": "string"
+        },
+        "EntryTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "PossibleTimeGate": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EntriesProgressNodeJson": {
+      "type": "object",
+      "required": [
+        "NodeID",
+        "NextNodeID",
+        "GameList",
+        "MinBet",
+        "Goal",
+        "Rewards",
+        "IsLastNode",
+        "ResegmentFlag",
+        "MiniGame",
+        "ContributionLevel",
+        "ButtonActionType",
+        "ButtonActionData",
+        "ButtonActionText",
+        "CustomTexts",
+        "EntryTypes"
+      ],
+      "properties": {
+        "NodeID": {
+          "type": "number"
+        },
+        "NextNodeID": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "GameList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "MinBet": {
+          "$ref": "#/definitions/MinBetJson"
+        },
+        "Goal": {
+          "$ref": "#/definitions/GoalJson"
+        },
+        "Rewards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RewardJson"
+          }
+        },
+        "IsLastNode": {
+          "type": "boolean"
+        },
+        "HideLoadingScreenForReward": {
+          "type": "boolean"
+        },
+        "ResegmentFlag": {
+          "type": "boolean"
+        },
+        "MiniGame": {
+          "type": "string"
+        },
+        "ContributionLevel": {
+          "type": "string"
+        },
+        "ButtonActionType": {
+          "type": "string"
+        },
+        "ButtonActionData": {
+          "type": "string"
+        },
+        "ButtonActionText": {
+          "type": "string"
+        },
+        "PrizeBoxIndex": {
+          "type": "integer"
+        },
+        "CustomTexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "PossibleItemCollect": {
+          "type": "string"
+        },
+        "EntryTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "PossibleTimeGate": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DummyNodeJson": {
+      "type": "object",
+      "required": [
+        "NodeID",
+        "NextNodeID",
+        "DefaultNodeID",
+        "Rewards",
+        "IsLastNode",
+        "ResegmentFlag",
+        "MiniGame",
+        "ContributionLevel",
+        "ButtonActionType",
+        "ButtonActionData",
+        "ButtonActionText",
+        "CustomTexts",
+        "IsChoiceEvent"
+      ],
+      "properties": {
+        "NodeID": {
+          "type": "number"
+        },
+        "NextNodeID": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "DefaultNodeID": {
+          "type": "number"
+        },
+        "Rewards": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RewardJson"
+          }
+        },
+        "IsLastNode": {
+          "type": "boolean"
+        },
+        "HideLoadingScreenForReward": {
+          "type": "boolean"
+        },
+        "ResegmentFlag": {
+          "type": "boolean"
+        },
+        "MiniGame": {
+          "type": "string"
+        },
+        "ContributionLevel": {
+          "type": "string"
+        },
+        "ButtonActionType": {
+          "type": "string"
+        },
+        "ButtonActionData": {
+          "type": "string"
+        },
+        "ButtonActionText": {
+          "type": "string"
+        },
+        "PrizeBoxIndex": {
+          "type": "integer"
+        },
+        "CustomTexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "IsChoiceEvent": {
+          "type": "boolean"
+        },
+        "PossibleTimeGate": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PrizePoolNodeJson": {
+      "type": "object",
+      "required": [
+        "NodeID",
+        "GameList",
+        "MinBet",
+        "GoalType",
+        "ResegmentFlag",
+        "ButtonActionType",
+        "ButtonActionData",
+        "ButtonActionText",
+        "CustomTexts"
+      ],
+      "properties": {
+        "NodeID": {
+          "type": "number"
+        },
+        "GameList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "MinBet": {
+          "$ref": "#/definitions/MinBetJson"
+        },
+        "GoalType": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ResegmentFlag": {
+          "type": "boolean"
+        },
+        "ButtonActionType": {
+          "type": "string"
+        },
+        "ButtonActionData": {
+          "type": "string"
+        },
+        "ButtonActionText": {
+          "type": "string"
+        },
+        "PrizeBoxIndex": {
+          "type": "integer"
+        },
+        "CustomTexts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "PossibleItemCollect": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Node": {
+      "type": "object",
+      "required": [],
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "ProgressNode": {
+          "$ref": "#/definitions/ProgressNodeJson"
+        },
+        "EntriesNode": {
+          "$ref": "#/definitions/EntiresNodeJson"
+        },
+        "EntriesProgressNode": {
+          "$ref": "#/definitions/EntriesProgressNodeJson"
+        },
+        "DummyNode": {
+          "$ref": "#/definitions/DummyNodeJson"
+        },
+        "PrizePoolNode": {
+          "$ref": "#/definitions/PrizePoolNodeJson"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Stage": {
+      "type": "object",
+      "required": [
+        "StageID",
+        "Nodes"
+      ],
+      "properties": {
+        "StageID": {
+          "type": "number"
+        },
+        "Nodes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Node"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "Round": {
+      "type": "object",
+      "required": [
+        "RoundRange",
+        "Stages"
+      ],
+      "properties": {
+        "RoundRange": {
+          "type": "string"
+        },
+        "Stages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Stage"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NodeEventSegmentJson": {
+      "type": "object",
+      "required": [],
+      "properties": {
+        "PossibleSegmentInfo": {
+          "$ref": "#/definitions/SegmentInfoJson"
+        },
+        "Stages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Stage"
+          }
+        },
+        "Rounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Round"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "NodeEventData": {
+      "type": "object",
+      "required": [
+        "EventID",
+        "MinLevel",
+        "Segment",
+        "AssetBundlePath",
+        "BlockerPrefabPath",
+        "RoundelPrefabPath",
+        "EventCardPrefabPath",
+        "NodeCompletionPrefabPath",
+        "ContentKey",
+        "NumberOfRepeats",
+        "Segments",
+        "StartingEventCurrency",
+        "IsCurrencyEvent",
+        "TimeWarning",
+        "EntryTypes",
+        "ManualClaim",
+        "ShowPopupOnEmptyReward"
+      ],
+      "properties": {
+        "EventID": {
+          "type": "string"
+        },
+        "MinLevel": {
+          "type": "number"
+        },
+        "Segment": {
+          "type": "string"
+        },
+        "AssetBundlePath": {
+          "type": "string"
+        },
+        "BlockerPrefabPath": {
+          "type": "string"
+        },
+        "RoundelPrefabPath": {
+          "type": "string"
+        },
+        "IsRoundelHidden": {
+          "type": "boolean"
+        },
+        "ShowRoundelOnAllMachines": {
+          "type": "boolean"
+        },
+        "Test1": {
+          "type": "string"
+        },
+        "Test2": {
+          "type": "string"
+        },
+        "UseNodeFailedNotification": {
+          "type": "boolean"
+        },
+        "IsPrizePursuit": {
+          "type": "boolean"
+        },
+        "EventCardPrefabPath": {
+          "type": "string"
+        },
+        "UseForceLandscapeOnWeb": {
+          "type": "boolean"
+        },
+        "NodeCompletionPrefabPath": {
+          "type": "string"
+        },
+        "ContentKey": {
+          "type": "string"
+        },
+        "NumberOfRepeats": {
+          "type": "number"
+        },
+        "Segments": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/NodeEventSegmentJson"
+          }
+        },
+        "StartingEventCurrency": {
+          "type": "number"
+        },
+        "IsCurrencyEvent": {
+          "type": "boolean"
+        },
+        "TimeWarning": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "EntryTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ManualClaim": {
+          "type": "boolean"
+        },
+        "ShowPopupOnEmptyReward": {
+          "type": "boolean"
+        },
+        "SkipLastManualClaim": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "TeamDataJson": {
+      "type": "object",
+      "required": [
+        "TeamName",
+        "DisplayName",
+        "WinWeight",
+        "PickWeight"
+      ],
+      "properties": {
+        "TeamName": {
+          "type": "string"
+        },
+        "DisplayName": {
+          "type": "string"
+        },
+        "WinWeight": {
+          "type": "number"
+        },
+        "PickWeight": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    },
+    "LeaderboardEventSegmentJson": {
+      "type": "object",
+      "required": [
+        "GameList",
+        "Minbet",
+        "GoalTypes",
+        "TeamData"
+      ],
+      "properties": {
+        "PossibleSegmentInfo": {
+          "$ref": "#/definitions/SegmentInfoJson"
+        },
+        "GameList": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "Minbet": {
+          "$ref": "#/definitions/MinBetJson"
+        },
+        "GoalTypes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "TeamData": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TeamDataJson"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "LeaderboardEventData": {
+      "type": "object",
+      "required": [
+        "EventID",
+        "MinLevel",
+        "Segments",
+        "GracePeriod",
+        "AssetBundlePath",
+        "BlockerPrefabPath",
+        "RoundelPrefabPath",
+        "EventCardPrefabPath",
+        "ButtonActionType",
+        "ButtonActionData",
+        "ButtonActionText"
+      ],
+      "properties": {
+        "EventID": {
+          "type": "string"
+        },
+        "MinLevel": {
+          "type": "number"
+        },
+        "Segments": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/LeaderboardEventSegmentJson"
+          }
+        },
+        "GracePeriod": {
+          "type": "number"
+        },
+        "AssetBundlePath": {
+          "type": "string"
+        },
+        "BlockerPrefabPath": {
+          "type": "string"
+        },
+        "RoundelPrefabPath": {
+          "type": "string"
+        },
+        "IsRoundelHidden": {
+          "type": "boolean"
+        },
+        "EventCardPrefabPath": {
+          "type": "string"
+        },
+        "ButtonActionType": {
+          "type": "string"
+        },
+        "ButtonActionData": {
+          "type": "string"
+        },
+        "ButtonActionText": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EventData": {
+      "type": "object",
+      "required": [],
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "PossibleNodeEventData": {
+          "$ref": "#/definitions/NodeEventData"
+        },
+        "PossibleLeaderboardEventData": {
+          "$ref": "#/definitions/LeaderboardEventData"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "required": [
+    "Events",
+    "IsFallbackConfig"
+  ],
+  "properties": {
+    "Events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/EventData"
+      }
+    },
+    "IsFallbackConfig": {
+      "type": "boolean"
+    },
+    "$schema": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "description": "fix minigame",
+  "title": "LiveEventData_V10_Generated"
+}

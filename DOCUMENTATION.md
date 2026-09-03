@@ -78,6 +78,8 @@ utils/
   helpers.py                        # Парсинг/форматирование строк
   validators.py                     # Функции валидации (возвращают List[str])
 requirements.txt                    # Зависимости приложения
+schema/
+  LiveEventData_V10.json            # JSON Schema конфига LiveEvent (для вкладки валидации)
 .kiro/specs/singlepick-tab/         # Спецификация вкладки SinglePick (requirements/design/tasks)
 ```
 
@@ -101,14 +103,11 @@ requirements.txt                    # Зависимости приложени�
         "ContentKey": "MyEvent",
         "MinLevel": 1,
         "NumberOfRepeats": -1,
-        "IsRoundelHidden": false,
-        "ShowRoundelOnAllMachines": false,
-        "IsPrizePursuit": false,
-        "UseNodeFailedNotification": false,
-        "UseForceLandscapeOnWeb": false,
         "IsCurrencyEvent": false,
         "StartingEventCurrency": 0.0,
         "TimeWarning": "2026-10-01T00:00:00Z",
+        "ManualClaim": false,
+        "ShowPopupOnEmptyReward": false,
         "EntryTypes": [],
         "Segment": "Default",
         "Segments": {
@@ -133,7 +132,6 @@ requirements.txt                    # Зависимости приложени�
                       "ButtonActionData": "",
                       "ButtonActionText": "PLAY NOW!",
                       "CustomTexts": [],
-                      "HideLoadingScreenForReward": false,
                       "PossibleItemCollect": "Default"
                     }
                   }
@@ -196,6 +194,10 @@ requirements.txt                    # Зависимости приложени�
 (`AppState.get_instance()` / `get_singlepick_state()`).
 
 Флаг `st.session_state["show_advanced"]` читают формы события и узлов, скрывая под ним редкие поля.
+Под ним же собраны все необязательные по схеме флаги, которые попадают в JSON только когда включены:
+`IsRoundelHidden`, `ShowRoundelOnAllMachines`, `IsPrizePursuit`, `UseNodeFailedNotification`,
+`UseForceLandscapeOnWeb` (уровень события) и `HideLoadingScreenForReward` (уровень узла).
+Когда тумблер выключен, значения не теряются — они берутся из редактируемого объекта или из дефолтов.
 
 ---
 
@@ -255,11 +257,13 @@ requirements.txt                    # Зависимости приложени�
 | `number_of_repeats` | `NumberOfRepeats` | `int` | `-1` (бесконечно) |
 | `entry_types` | `EntryTypes` | `List[str]` | `[]` |
 | `segments` | `Segments` | `Dict[str, Segment]` | `{}` |
-| `is_roundel_hidden` | `IsRoundelHidden` | `bool` | `False` |
-| `use_node_failed_notification` | `UseNodeFailedNotification` | `bool` | `False` |
-| `is_prize_pursuit` | `IsPrizePursuit` | `bool` | `False` |
-| `use_force_landscape_on_web` | `UseForceLandscapeOnWeb` | `bool` | `False` |
-| `show_roundel_on_all_machines` | `ShowRoundelOnAllMachines` | `bool` | `False` |
+| `is_roundel_hidden` | `IsRoundelHidden` | `bool` | `False` — **пишется только если `True`** |
+| `use_node_failed_notification` | `UseNodeFailedNotification` | `bool` | `False` — **пишется только если `True`** |
+| `is_prize_pursuit` | `IsPrizePursuit` | `bool` | `False` — **пишется только если `True`** |
+| `use_force_landscape_on_web` | `UseForceLandscapeOnWeb` | `bool` | `False` — **пишется только если `True`** |
+| `show_roundel_on_all_machines` | `ShowRoundelOnAllMachines` | `bool` | `False` — **пишется только если `True`** |
+| `manual_claim` | `ManualClaim` | `bool` | `False` — обязательное по схеме V10 |
+| `show_popup_on_empty_reward` | `ShowPopupOnEmptyReward` | `bool` | `False` — обязательное по схеме V10 |
 | `starting_event_currency` | `StartingEventCurrency` | `float` | `0.0` |
 | `is_currency_event` | `IsCurrencyEvent` | `bool` | `False` |
 | `time_warning` | `TimeWarning` | `str` | `get_default_time_warning()` |
@@ -295,7 +299,7 @@ requirements.txt                    # Зависимости приложени�
 | `button_action_text` | `ButtonActionText` | `str` | `"PLAY NOW!"` |
 | `custom_texts` | `CustomTexts` | `List[str]` | `[]` |
 | `possible_item_collect` | `PossibleItemCollect` | `str` | `""` — **пишется только если непусто** |
-| `hide_loading_screen` | `HideLoadingScreenForReward` | `bool` | `False` |
+| `hide_loading_screen` | `HideLoadingScreenForReward` | `bool` | `False` — **пишется только если `True`** |
 | `prize_box_index` | `PrizeBoxIndex` | `int` | `-1` — **пишется только если `> 0`** |
 
 **Класс `EntriesNode`** → `{"EntriesNode": {...}}`
@@ -330,7 +334,7 @@ requirements.txt                    # Зависимости приложени�
 | `button_action_type/data/text` | `ButtonAction*` | `str` | `""` |
 | `custom_texts` | `CustomTexts` | `List[str]` | `[]` |
 | `is_choice_event` | `IsChoiceEvent` | `bool` | `True` |
-| `hide_loading_screen` | `HideLoadingScreenForReward` | `bool` | `False` |
+| `hide_loading_screen` | `HideLoadingScreenForReward` | `bool` | `False` — **пишется только если `True`** |
 | `prize_box_index` | `PrizeBoxIndex` | `int` | `-1` — **пишется только если `> 0`** |
 
 ---
@@ -359,7 +363,7 @@ requirements.txt                    # Зависимости приложени�
 |---|---|---|
 | `FixedGoal` | `target: int` | `FixedGoal` → `{"Target"}` |
 | `SpinpadGoal` | `multiplier: float`, `min: int`, `max: int` | `SpinpadGoal` → `{"Multiplier", "Min", "Max"}` |
-| `ConsecutiveWinsGoal` | `number_of_streaks_target: int`, `multiplier: float`, `min: int`, `max: int` | `ConsecutiveWinsGoal` → `{"NumberOfStreaksTarget", "WinsInStreakSpinPadGoal": {"Multiplier", "Min", "Max"}}` |
+| `ConsecutiveWinsGoal` | `wins_in_streak_target: int`, `multiplier: float`, `min: int`, `max: int` | `ConsecutiveWinsGoal` → `{"WinsInStreakTarget", "NumberOfStreaksSpinPadGoal": {"Multiplier", "Min", "Max"}}` |
 | `TotalCoinsPerDayGoal` | `multiplier: float`, `min: int`, `max: int` | `TotalCoinsPerDay` → `{"Multiplier", "Min", "Max"}` |
 | `TotalCoinsPerDayWithSpinLimiterGoal` | `spin_limiter: int`, `multiplier: float`, `min: int`, `max: int` | `TotalCoinsPerDayWithSpinLimiter` |
 | `FixedGoalWithSpinLimiterGoal` | `target: int`, `spin_limiter: int` | `FixedGoalWithSpinLimiter` |
@@ -645,7 +649,7 @@ requirements.txt                    # Зависимости приложени�
 | Шаг | Условие показа | Содержимое |
 |---|---|---|
 | Пакетный импорт | `batch_import_event_idx >= 0` | Заголовок с `EventID`, кнопка закрытия, `render_batch_import_panel()` |
-| **ШАГ 1: Событие** | редактируется событие или `creating_event`, и не `creating_segment` | `st.form` со всеми полями события; блок «💵 CashOutEvent Settings»; при `show_advanced` — `StartingEventCurrency`, `IsCurrencyEvent`, `TimeWarning`; проверка уникальности `EventID` |
+| **ШАГ 1: Событие** | редактируется событие или `creating_event`, и не `creating_segment` | `st.form` с полями события, галочками `ManualClaim` / `ShowPopupOnEmptyReward` и проверкой уникальности `EventID`. Под `show_advanced` — expander «⚙️ Расширенные параметры события»: `IsRoundelHidden`, `ShowRoundelOnAllMachines`, группа «💵 CashOutEvent» (`UseNodeFailedNotification`, `IsPrizePursuit`, `UseForceLandscapeOnWeb`), `StartingEventCurrency`, `IsCurrencyEvent`, `TimeWarning` |
 | **ШАГ 2: Сегмент** | есть текущее событие и (редактируется сегмент или `creating_segment`) | Радио «Тип `PossibleSegmentInfo`» (4 типа + «Без `PossibleSegmentInfo`») **вне** формы, затем форма с именем и значением; имя и значение обязательны |
 | **ШАГ 3: Узел** | редактируется узел или `creating_node` | Для нового узла — радио выбора типа; далее `render_node_editor(node_type, node_obj, key_prefix=...)`. Ненулевой результат означает «сохранить» |
 
@@ -803,8 +807,9 @@ Streamlit кэширует значения виджетов по их ключ�
 Что показывают формы:
 
 - **ProgressNode** — `NodeID`, `NextNodeID`, `GameList`, `MiniGame`, кнопочные поля, `IsLastNode`,
-  `HideLoadingScreenForReward`, MinBet, цель, список наград, `CustomTexts`, `PossibleItemCollect`,
-  `PrizeBoxIndex` (подпись «0 = не задано»); под `show_advanced` — `ResegmentFlag`, `ContributionLevel`.
+  MinBet, цель, список наград, `CustomTexts`, `PossibleItemCollect`,
+  `PrizeBoxIndex` (подпись «0 = не задано»); под `show_advanced` — `ResegmentFlag`,
+  `HideLoadingScreenForReward`, `ContributionLevel`.
   Пустой `PossibleItemCollect` при сохранении заменяется на `"Default"`; пустой `NextNodeID` → `[2]`.
 - **EntriesNode** — `NodeID`, `GameList`, `GoalType`, `EntryTypes`, MinBet, кнопочные поля,
   `CustomTexts`, `PossibleItemCollect`, `PrizeBoxIndex`; под `show_advanced` — `ResegmentFlag`.
@@ -833,6 +838,10 @@ Streamlit кэширует значения виджетов по их ключ�
 `SpinpadGoal`, `FixedGoal`, `ConsecutiveWinsGoal`, `TotalCoinsPerDay`,
 `TotalCoinsPerDayWithSpinLimiter`, `FixedGoalWithSpinLimiter`. Тип текущих параметров определяется
 по `isinstance`; поля рисуются под выбранный тип. Изменения применяются сразу.
+
+Для `ConsecutiveWinsGoal` подписи полей соответствуют схеме: скаляр — `WinsInStreakTarget`
+(побед в серии), блок `Multiplier`/`Min`/`Max` — `NumberOfStreaksSpinPadGoal` (количество серий).
+`Multiplier` ограничен снизу значением `0.001`, поскольку схема требует `exclusiveMinimum: 0`.
 
 ---
 
@@ -1064,6 +1073,8 @@ SinglePick
 
 - **`PrizeBoxIndex = 0` не сохраняется.** Все три типа узлов пишут ключ только при значении `> 0`,
   а формы подписывают поле как «0 = не задано», поэтому нулевой индекс молча выпадает из JSON.
+  Схема V10 при этом допускает и `0`, и отрицательные значения — см.
+  [«Расхождения со схемой V10»](#расхождения-со-схемой-v10).
 - **`DummyNode` теряет награды.** Форма не редактирует список наград и при сохранении всегда
   подставляет одну награду по умолчанию (`Chips 2 500 000`), затирая исходные.
 - **Сброс ключей виджетов неполон.** Списки в `_clear_widget_keys` не содержат ключей расширенных
@@ -1083,3 +1094,118 @@ SinglePick
   Python.
 - **Переменные колонок в `editor_tab` названы наоборот** (`right_col, left_col = st.columns([2, 3])`):
   дерево отображается в левой колонке, редактор — в правой.
+
+---
+
+## Расхождения со схемой V10
+
+Сверено со схемой [schema/LiveEventData_V10.json](schema/LiveEventData_V10.json)
+(`title: "LiveEventData_V10_Generated"`, `description: "fix minigame"`, 35 определений).
+Её же нужно подсовывать в поле «📋 Схема» на вкладке редактора, чтобы проверить конфиг из UI.
+Результаты ниже получены прогоном вывода моделей через `jsonschema.Draft7Validator` и проверкой
+цикла «загрузить → сохранить».
+
+### 1. Обязательные `ManualClaim` и `ShowPopupOnEmptyReward` — ✅ исправлено
+
+Ранее `NodeEventData.required` содержал два поля, которых в коде не было вообще, из-за чего **любой**
+экспортированный конфиг давал две ошибки (`'ManualClaim' is a required property`,
+`'ShowPopupOnEmptyReward' is a required property`).
+
+Что сделано: поля `manual_claim` и `show_popup_on_empty_reward` добавлены в
+`PossibleNodeEventData` (сериализация как `ManualClaim` / `ShowPopupOnEmptyReward`, чтение с дефолтом
+`False`), в `make_node_event` и в форму события — две галочки рядом с `IsRoundelHidden`
+и `ShowRoundelOnAllMachines`. Проверено валидатором: конфиги с `ProgressNode`, `EntriesNode`
+и `DummyNode` теперь проходят схему без ошибок.
+
+**Остаётся:** необязательное `SkipLastManualClaim` приложение по-прежнему не знает и вырезает
+при сохранении (см. пункт 4).
+
+### 2. `ConsecutiveWinsGoal`: имена полей — ✅ исправлено
+
+Схема требует `WinsInStreakTarget` (integer) и `NumberOfStreaksSpinPadGoal`
+(`MultiplierBasedValue`), а приложение писало эти имена перекрёстно —
+`NumberOfStreaksTarget` и `WinsInStreakSpinPadGoal`, — поэтому цель схему не проходила.
+
+Что сделано:
+
+- поле модели `number_of_streaks_target` переименовано в `wins_in_streak_target`,
+  `to_dict()` пишет `WinsInStreakTarget` и `NumberOfStreaksSpinPadGoal`;
+- `from_dict()` читает новые имена, а при их отсутствии — старые
+  (`NumberOfStreaksTarget` / `WinsInStreakSpinPadGoal`), поэтому ранее созданные конфиги
+  открываются без ошибок и при сохранении переписываются в схемные имена;
+- в `goal_widget` подписи приведены к схеме: скаляр — «WinsInStreakTarget (побед в серии)»,
+  блок `Multiplier`/`Min`/`Max` подписан как `NumberOfStreaksSpinPadGoal` (количество серий);
+- `Multiplier` ограничен снизу значением `0.001` — схема требует `exclusiveMinimum: 0`,
+  а прежний виджет допускал `0.0`.
+
+> **Внимание при открытии старых конфигов.** Значения читаются позиционно: скаляр остаётся скаляром,
+> блок `Multiplier/Min/Max` — блоком. Но по прежним (неверным) подписям в UI скаляр заполняли как
+> «число серий», а теперь он означает «побед в серии». Восстановить исходный замысел автоматически
+> нельзя, поэтому у ранее собранных целей этого типа значения стоит перепроверить вручную.
+
+### 3. Сущности схемы, на которых приложение падает или портит данные
+
+| Сущность схемы | Поведение приложения |
+|---|---|
+| `PossibleLeaderboardEventData` — второй допустимый тип события в `EventData` | Дерево падает с `KeyError` на `event_dict["PossibleNodeEventData"]` ([event_tree.py:56](ui/widgets/event_tree.py:56)), `duplicate_event` — тоже `KeyError`. `PossibleNodeEventData.from_dict()` молча возвращает пустое событие со всеми дефолтами (`EventID = "MyEvent"`), и сохранение затирает оригинал |
+| `EntriesProgressNode` | `node_from_dict` → `ValueError: Unknown node type` — событие невозможно открыть |
+| `PrizePoolNode` | то же самое |
+| `Rounds` вместо `Stages` в сегменте | Загружается без ошибки, но теряется: `Segment.from_dict` читает только `Stages` и `PossibleSegmentInfo` |
+
+### 4. Молчаливая потеря полей при цикле «загрузить → сохранить»
+
+Поля ниже присутствуют в схеме, но не читаются моделями, поэтому вырезаются из результата
+без предупреждения (проверено round-trip'ом):
+
+| Уровень | Теряется |
+|---|---|
+| Событие | `SkipLastManualClaim`, `Test1`, `Test2` (`ManualClaim` и `ShowPopupOnEmptyReward` сохраняются с тех пор, как реализован пункт 1) |
+| Нода (`ProgressNode` и др.) | `FallbackGoal`, `PossibleTimeGate`, `ClaimTooltipText` |
+| Цель | `Conditions` (`MinWin` / `Threshold` → `AvgBetBasedThreshold` / `FixedValue`) |
+| Сегмент | `Rounds` |
+
+В staged-режиме потери ограничены тем событием, которое действительно открывали в редакторе:
+остальные события хранятся сырыми словарями и остаются нетронутыми.
+
+### 5. UI не ограничивает значения, заданные в схеме через enum и pattern
+
+| Поле | Ограничение схемы | Поведение приложения |
+|---|---|---|
+| `ProgressNode.MiniGame` | `anyOf`: `FlatReward` либо `^SinglePick_` | Свободное текстовое поле. У `DummyNode` и `EntriesProgressNode` `MiniGame` — обычная строка, ограничение действует только для `ProgressNode` |
+| `FreeplayUnlockReward.GameName` | enum из 227 значений | Свободное текстовое поле (дефолт `Buffalo` в enum есть) |
+| `CollectableSellPacksReward.PackId` | enum `sellPack*` | Свободное поле + колонка `pack_id` в CSV-импорте |
+| `CollectableMagicPacksReward.PackId` | enum `magicPack*` | Свободное поле |
+| `NumPacks` | `maximum: 5` | Для `Packs` верхней границы в UI нет, дефолт модели — `4`; для `MagicPacks` ограничение `max_value=5` выставлено. Импорт из CSV границу не проверяет |
+| `FixedReward.Currency` | pattern `^(Entries_[a-zA-Z0-9]+\|Tickets\|Chips\|Loyalty\|VipPoints\|BoardGame(Dices\|Builds\|RareBuilds))$` | Тип «Sweepstakes» подставляет литерал `Entries_Name` — формально pattern проходит, но это заглушка вместо реального имени entries |
+| `RtpReward.Currency` | enum `["Chips"]` | Захардкожен `Chips` — совпадает |
+
+### 6. `PrizeBoxIndex`
+
+Схема объявляет поле как `integer` без границ, то есть `0` и отрицательные значения допустимы.
+Приложение пишет ключ только при значении `> 0`, поэтому задать `0` нельзя, а загруженный из файла
+`0` при сохранении исчезает.
+
+### 7. Что сходится
+
+Совпадают: корень (`Events` + `IsFallbackConfig`), `Stage`, `SegmentInfoJson` (4 типа и опущение
+блока при пустом значении), `MinBetJson` (`FixedMinBet.MinBet`, `MinBetVariable.Variable/Min/Max`),
+`RewardJson` (все пять типов и их поля), `FixedGoal`, `SpinpadGoal`, `TotalCoinsPerDay`,
+`TotalCoinsPerDayWithSpinLimiter`, `FixedGoalWithSpinLimiter`, а также полные наборы `required`
+у `ProgressNode`, `EntriesNode` и `DummyNode`.
+
+### 8. Замечания к самой схеме
+
+Не относятся к приложению, но влияют на то, как строить в нём выпадающие списки:
+
+- `PurchaseRewardConfig` определён, но ни из одного места не используется (`RewardJson` его не включает)
+  — в LiveEvent награда-покупка недоступна, `PurchaseReward` существует только в схеме SinglePick.
+- enum `GameName` содержит **227 значений при 217 уникальных**. Дубликаты: `MoneyInTheBankBaconBlvd`,
+  `WingsOfThePhoenix`, `SafariStacks`, `SafariStacks_HR`, `PrettyDevil`, `LadyOfCythera`,
+  `LadyOfCythera_HR`, `FestivalOfRiches`, `LuckyHog`, `TreasureVoyage`. Есть пары, различающиеся только
+  регистром: `LuckyHoneyCombFortuneBags` / `LuckyHoneycombFortuneBags`, а также
+  `ChiliChiliFireBoosted` и `ChilliChilliFireBoosted`.
+- `Test1` и `Test2` в `NodeEventData` выглядят как отладочные остатки.
+- Опечатка в имени определения: `EntiresNodeJson` (ключ узла `EntriesNode` при этом корректный).
+- `TimeWarning` и `PossibleTimeGate` объявлены с `format: date-time`, но `validate_config` вызывает
+  `jsonschema.validate` **без** `format_checker`, поэтому формат даты фактически не проверяется даже
+  при загруженной схеме.

@@ -81,6 +81,9 @@ class PossibleNodeEventData(Serializable):
     is_prize_pursuit: bool = False
     use_force_landscape_on_web: bool = False
     show_roundel_on_all_machines: bool = False
+    # Обязательные по схеме V10
+    manual_claim: bool = False
+    show_popup_on_empty_reward: bool = False
     # Скрытые поля (автоматически заполняются)
     starting_event_currency: float = 0.0
     is_currency_event: bool = False
@@ -101,14 +104,17 @@ class PossibleNodeEventData(Serializable):
                 "ContentKey": self.content_key,
                 "MinLevel": self.min_level,
                 "NumberOfRepeats": self.number_of_repeats,
-                "IsRoundelHidden": self.is_roundel_hidden,                
-                "ShowRoundelOnAllMachines": self.show_roundel_on_all_machines,               
-                "IsPrizePursuit": self.is_prize_pursuit,
-                "UseNodeFailedNotification": self.use_node_failed_notification,
-                "UseForceLandscapeOnWeb": self.use_force_landscape_on_web,
-                "IsCurrencyEvent": self.is_currency_event,               
+                # Необязательные флаги: пишем только когда включены (False = ключ не пишем)
+                **({"IsRoundelHidden": True} if self.is_roundel_hidden else {}),
+                **({"ShowRoundelOnAllMachines": True} if self.show_roundel_on_all_machines else {}),
+                **({"IsPrizePursuit": True} if self.is_prize_pursuit else {}),
+                **({"UseNodeFailedNotification": True} if self.use_node_failed_notification else {}),
+                **({"UseForceLandscapeOnWeb": True} if self.use_force_landscape_on_web else {}),
+                "IsCurrencyEvent": self.is_currency_event,
                 "StartingEventCurrency": self.starting_event_currency,
                 "TimeWarning": self.time_warning,
+                "ManualClaim": self.manual_claim,
+                "ShowPopupOnEmptyReward": self.show_popup_on_empty_reward,
                 "EntryTypes": self.entry_types,
                 "Segment": self.segment,
                 "Segments": segments_dict,
@@ -140,6 +146,8 @@ class PossibleNodeEventData(Serializable):
             is_prize_pursuit=inner.get("IsPrizePursuit", False),
             use_force_landscape_on_web=inner.get("UseForceLandscapeOnWeb", False),
             show_roundel_on_all_machines=inner.get("ShowRoundelOnAllMachines", False),
+            manual_claim=inner.get("ManualClaim", False),
+            show_popup_on_empty_reward=inner.get("ShowPopupOnEmptyReward", False),
             starting_event_currency=inner.get("StartingEventCurrency", 0.0),
             is_currency_event=inner.get("IsCurrencyEvent", False),
             time_warning=inner.get("TimeWarning", get_default_time_warning()),
@@ -163,6 +171,8 @@ def make_node_event(
     is_prize_pursuit: bool = False,
     use_force_landscape_on_web: bool = False,
     show_roundel_on_all_machines: bool = False,
+    manual_claim: bool = False,
+    show_popup_on_empty_reward: bool = False,
     starting_event_currency: float = 0.0,
     is_currency_event: bool = False,
     time_warning: Optional[str] = None,
@@ -186,6 +196,8 @@ def make_node_event(
         is_prize_pursuit=is_prize_pursuit,
         use_force_landscape_on_web=use_force_landscape_on_web,
         show_roundel_on_all_machines=show_roundel_on_all_machines,
+        manual_claim=manual_claim,
+        show_popup_on_empty_reward=show_popup_on_empty_reward,
         starting_event_currency=starting_event_currency,
         is_currency_event=is_currency_event,
         time_warning=time_warning if time_warning is not None else get_default_time_warning(),
